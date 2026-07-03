@@ -1,0 +1,1621 @@
+/* ==========================================================================
+   1. VARIABLES & ROOT
+   ========================================================================== */
+:root {
+    --vada-black: #080808;
+    --vada-panel: #111111;
+    --vada-accent: #00f0ff; /* Cyber Cyan */
+    --vada-border: rgba(255, 255, 255, 0.08);
+    --vada-glass: rgba(20, 20, 20, 0.7);
+    --titlebar-height: 32px;
+}
+
+/* ==========================================================================
+   2. BASE STYLES
+   ========================================================================== */
+body {
+    margin: 0;
+    background-color: var(--vada-black);
+    color: #e0e0e0;
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    letter-spacing: 0.5px;
+    overflow: hidden;
+}
+
+/* ==========================================================================
+   3. LAYOUT STRUCTURE
+   ========================================================================== */
+.app-container {
+    margin-top: var(--titlebar-height);
+    display: grid;
+    grid-template-columns: var(--left-width, 280px) 1fr var(--right-width, 320px);
+    height: calc(100vh - var(--titlebar-height));
+    gap: 1px;
+    background-color: var(--vada-border);
+    transition: grid-template-columns 0.4s cubic-bezier(0.19, 1, 0.22, 1);
+}
+
+aside {
+    position: relative;
+    overflow: visible !important; /* CRITICAL: Allows the tray to slide OUT of the sidebar */
+    background-color: var(--vada-black);
+    display: flex;
+    flex-direction: column;
+    z-index: 50;
+}
+
+aside, main {
+    background-color: var(--vada-black);
+    display: flex;
+    flex-direction: column;
+}
+
+aside:last-child {
+    padding: 20px;
+}
+
+.panel-header {
+    padding: 20px;
+    border-bottom: 1px solid var(--vada-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    -webkit-app-region: no-drag !important;
+}
+
+.panel-header h2 {
+    font-size: 10px;
+    text-transform: uppercase;
+    color: #888;
+    margin: 0;
+    letter-spacing: 2px;
+}
+
+/* ==========================================================================
+   4. TITLE BAR & WINDOW CONTROLS
+   ========================================================================== */
+.salray-title-bar {
+    height: var(--titlebar-height);
+    background: #000;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--vada-border);
+    position: fixed;
+    top: 0; left: 0; width: 100%;
+    z-index: 99999; /* Boosted to stay above everything */
+    -webkit-app-region: drag; /* THE ENTIRE BAR IS DRAGGABLE BY DEFAULT */
+}
+
+.drag-region {
+    flex: 1;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    padding-left: 15px;
+    pointer-events: none; /* Let the drag pass through the text to the bar */
+}
+
+.app-id {
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: #444; /* Dimmed so it's not distracting */
+    font-weight: bold;
+    user-select: none;
+}
+
+.window-controls {
+    display: flex;
+    height: 100%;
+    -webkit-app-region: no-drag !important; /* CRITICAL: Buttons must NOT be draggable */
+    z-index: 100000;
+}
+
+.window-controls button {
+    -webkit-app-region: no-drag !important;
+    pointer-events: auto !important;
+    background: transparent;
+    border: none;
+    color: #555;
+    width: 46px;
+    height: 100%;
+    cursor: pointer !important;
+}
+
+.window-controls button:hover {
+    background: #222;
+    color: white;
+}
+
+/* ==========================================================================
+   5. THE CANVAS AREA & INTERACTIVE SURFACE
+   ========================================================================== */
+.canvas-area {
+    position: relative;
+    background: radial-gradient(circle at center, #111 0%, #080808 100%);
+    overflow: hidden;
+}
+
+.grid-dots {
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(var(--vada-border) 1px, transparent 1px);
+    background-size: 40px 40px;
+}
+
+.canvas-stage {
+    flex: 1;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #020202;
+    overflow: visible !important;
+}
+
+#activeSurface {
+    position: absolute;
+    background: transparent;
+    border: 2px solid #00f2ff; /* Matches the cyan border from your screenshot */
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.layer-info {
+    position: absolute;
+    top: -25px;
+    left: 0;
+    font-size: 9px;
+    color: var(--vada-accent);
+    text-transform: uppercase;
+}
+
+/* ==========================================================================
+   6. TEMPLATE GRID & CARDS
+   ========================================================================== */
+.template-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 20px;
+    padding: 30px;
+    overflow-y: auto;
+}
+
+.template-card {
+    background: var(--vada-panel);
+    border: 1px solid var(--vada-border);
+    border-radius: 12px;
+    padding: 15px;
+    cursor: pointer !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    -webkit-app-region: no-drag !important;
+}
+
+.template-card:hover { border-color: var(--vada-accent); transform: translateY(-5px); background: #16161c; }
+.template-card.active { border-color: var(--vada-accent); box-shadow: 0 0 20px rgba(0, 240, 255, 0.1); }
+
+.preview-box {
+    width: 100%; height: 120px; background: #050505; border-radius: 6px; margin-bottom: 12px;
+    display: flex; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,0.03);
+}
+
+/* Card Icons Styles */
+.standard-wall { background: linear-gradient(45deg, #111, #1a1a1a); border: 1px solid var(--vada-accent); width: 80%; height: 50px; }
+.wide-strip { background: #111; border: 1px solid var(--vada-accent); width: 90%; height: 20px; }
+.curved-wall-icon { border: 1px solid var(--vada-accent); border-radius: 50% 50% 0 0 / 20% 20% 0 0; width: 80%; height: 40px; }
+.dual-stretch-icon { border: 1px solid var(--vada-accent); width: 90%; height: 25px; background: linear-gradient(90deg, transparent 49%, var(--vada-border) 50%, transparent 51%); }
+.pillars-icon { display: flex; gap: 10px; }
+.pillars-icon::before, .pillars-icon::after { content: ''; width: 10px; height: 50px; border: 1px solid var(--vada-accent); }
+.square-icon { width: 50px; height: 50px; border: 1px solid var(--vada-accent); }
+
+/* Cube 3D Styles */
+.cube-3d { position: relative; width: 50px; height: 50px; transform: rotateX(-20deg) rotateY(25deg); transform-style: preserve-3d; }
+.cube-face { position: absolute; width: 30px; height: 30px; border: 1px solid var(--vada-accent); background: rgba(0, 240, 255, 0.05); }
+.top { transform: rotateX(90deg) translateZ(15px); }
+.front { transform: translateZ(15px); }
+.side { transform: rotateY(90deg) translateZ(15px); }
+
+/* Triangle 3D Styles */
+.triangle-3d { width: 0; height: 0; border-left: 30px solid transparent; border-right: 30px solid transparent; border-bottom: 50px solid transparent; position: relative; filter: drop-shadow(0 0 5px var(--vada-accent)); }
+.triangle-3d::after { content: ''; position: absolute; top: 0; left: -30px; width: 0; height: 0; border-left: 30px solid transparent; border-right: 30px solid transparent; border-bottom: 50px solid var(--vada-accent); }
+
+/* ==========================================================================
+   7. MEDIA POOL & LISTS 
+   ========================================================================== */
+.btn-mini-add { 
+    background: transparent; border: 1px solid #333; color: #666; font-size: 8px;
+    text-transform: uppercase; padding: 4px 10px; cursor: pointer !important; border-radius: 4px;
+    position: relative;
+    z-index: 99999 !important;
+    pointer-events: auto !important;
+    -webkit-app-region: no-drag !important;
+    cursor: pointer !important;
+}
+.btn-mini-add:hover { color: white; border-color: #666; }
+
+.media-item {
+    display: flex; align-items: center; padding: 10px; background: rgba(255,255,255,0.02);
+    border: 1px solid var(--vada-border); border-radius: 6px; margin-bottom: 8px; cursor: pointer !important;
+}
+.media-item:hover { background: rgba(0, 240, 255, 0.05); border-color: #333; }
+.media-item.active { border-color: var(--vada-accent); background: rgba(0, 240, 255, 0.08); }
+
+.media-thumb { width: 40px; height: 30px; background: #000; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #444; border: 1px solid #222; }
+.media-meta { flex: 1; margin-left: 12px; }
+.media-meta label { display: block; font-size: 10px; color: #eee; cursor: pointer; }
+.media-meta span { font-size: 8px; color: #555; text-transform: uppercase; }
+.media-status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--vada-accent); box-shadow: 0 0 5px var(--vada-accent); }
+
+/* ==========================================================================
+   8. CONTROL DECK & TABS
+   ========================================================================== */
+.deck-tabs { display: flex; gap: 5px; }
+.tab-mini {
+    background: transparent; border: 1px solid #333; color: #666; font-size: 8px;
+    text-transform: uppercase; padding: 4px 10px; cursor: pointer !important; border-radius: 4px;
+}
+.tab-mini.active { border-color: var(--vada-accent); color: var(--vada-accent); }
+
+/* ==========================================================================
+   9. BENTO INPUTS & LOCK CONFIG (RESTORED)
+   ========================================================================== */
+.bento-input {
+    background: var(--vada-panel); border: 1px solid var(--vada-border);
+    padding: 15px; margin: 10px 20px; border-radius: 8px; -webkit-app-region: no-drag !important;
+}
+.bento-input label { display: block; font-size: 9px; color: #666; margin-bottom: 8px; }
+.bento-input input { background: transparent; border: none; color: white; font-size: 24px; font-weight: 300; width: 100%; outline: none; }
+.bento-input.mini { margin: 0; padding: 10px; flex: 1; min-width: 120px; }
+.bento-input.mini input { font-size: 16px; }
+
+/* LOCK CONFIG DESIGN */
+.lock-container {
+    margin: 10px 20px;
+    padding: 12px 15px;
+    background: #111;
+    border: 1px solid var(--vada-border);
+    border-radius: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    -webkit-app-region: no-drag !important;
+}
+.lock-container span {
+    font-size: 10px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    color: #888;
+    text-transform: uppercase;
+}
+#lockToggle {
+    width: 20px;
+    height: 20px;
+    cursor: pointer !important;
+    accent-color: var(--vada-accent);
+}
+
+/* ==========================================================================
+   10. BUTTONS & ANIMATIONS
+   ========================================================================== */
+.btn-primary-action {
+    width: calc(100% - 40px); margin: 10px 20px; padding: 18px !important; border-radius: 8px;
+    border: 2px solid var(--vada-accent); background: transparent; color: var(--vada-accent);
+    text-transform: uppercase; font-size: 11px; font-weight: bold; cursor: pointer !important;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); -webkit-app-region: no-drag !important;
+}
+.btn-primary-action:hover { background: rgba(0, 240, 255, 0.1); box-shadow: 0 0 25px rgba(0, 240, 255, 0.2); transform: scale(1.02); }
+
+.btn-vada {
+    width: 100%; /* Spans the full width of the parent's inner area */
+    margin: 10px 0; /* Remove horizontal margins, only keep vertical spacing if needed */
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid var(--vada-accent);
+    background: transparent;
+    color: var(--vada-accent);
+    text-transform: uppercase;
+    font-size: 11px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+.btn-vada:hover { background: var(--vada-accent); color: black; box-shadow: 0 0 15px var(--vada-accent); }
+
+.btn-chevron-back {
+    background: transparent; border: none; color: #555; font-size: 28px; line-height: 1;
+    cursor: pointer !important; display: flex; align-items: center; justify-content: center;
+    -webkit-app-region: no-drag !important;
+}
+.btn-chevron-back:hover { color: var(--vada-accent); transform: translateX(-2px); }
+
+/* ANIMATIONS */
+.status-tag { font-size: 9px; font-weight: bold; letter-spacing: 1px; color: #444; border: 1px solid var(--vada-border); padding: 2px 8px; border-radius: 4px; }
+.active-pulse { color: var(--vada-accent) !important; border-color: var(--vada-accent) !important; animation: pulse 2s infinite; }
+.scan-bar { position: absolute; width: 100%; height: 1px; background: var(--vada-accent); box-shadow: 0 0 10px var(--vada-accent); top: -10px; display: none; }
+.scanning .scan-bar { display: block; animation: vadaScan 4s infinite; }
+
+@keyframes vadaScan { 0% { top: 0; opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { top: 100%; opacity: 0; } }
+@keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+
+.corner-nodes span { position: absolute; width: 6px; height: 6px; background: var(--vada-accent); border: 1px solid black; }
+.corner-nodes span:nth-child(1) { top: -3px; left: -3px; }
+.corner-nodes span:nth-child(2) { top: -3px; right: -3px; }
+.corner-nodes span:nth-child(3) { bottom: -3px; left: -3px; }
+.corner-nodes span:nth-child(4) { bottom: -3px; right: -3px; }
+
+.source-tray {
+    position: absolute;
+    /* Position it exactly where the sidebar ends */
+    left: 280px; 
+    top: 70px; /* Adjust this to align with your + button row */
+    width: 200px;
+    
+    background: rgba(10, 10, 10, 0.98);
+    backdrop-filter: blur(25px);
+    border: 1px solid var(--vada-accent);
+    border-left: 2px solid var(--vada-accent);
+    
+    box-shadow: 20px 0 50px rgba(0, 0, 0, 0.5);
+    z-index: 99999; /* Ensure it stays above the canvas grid */
+    
+    /* Animation: Slide out from behind the sidebar */
+    transform: translateX(-100%); 
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.4s cubic-bezier(0.19, 1, 0.22, 1);
+}
+.source-tray.open {
+    transform: translateX(0);
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.app-container {
+    overflow: visible; /* Prevents the tray from being cut off by the main window grid */
+}
+
+.tray-header {
+    padding: 10px;
+    font-size: 8px;
+    letter-spacing: 1px;
+    color: var(--vada-accent);
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--vada-border);
+}
+
+.tray-opt {
+    padding: 12px;
+    font-size: 10px;
+    color: #888;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.tray-opt:hover {
+    background: rgba(0, 240, 255, 0.1);
+    color: #fff;
+    padding-left: 18px; /* Subtle "slide" effect on hover */
+}
+
+#closeTrayBtn {
+    background: none; border: none; color: #555; cursor: pointer;
+}
+
+/* ==========================================================================
+   RESTORED: TEMPLATE GALLERY TITLES & INFO
+   ========================================================================== */
+
+.card-info {
+    padding-top: 5px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.card-info .type {
+    display: block;
+    font-size: 11px;
+    font-weight: 700; /* Bold for hierarchy */
+    color: #ffffff;   /* High contrast */
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.card-info .res {
+    display: block;
+    font-size: 9px;
+    font-weight: 400;
+    color: var(--vada-accent); /* Cyan accent for the technical spec */
+    opacity: 0.8;
+    font-family: monospace;
+}
+
+/* Ensure the card header in the gallery looks correct */
+#galleryView .panel-header h2 {
+    font-size: 11px;
+    color: #eee;
+    letter-spacing: 2px;
+}
+
+#galleryView .status-tag {
+    background: rgba(0, 240, 255, 0.1);
+    color: var(--vada-accent);
+    border: 1px solid rgba(0, 240, 255, 0.3);
+}
+
+/* Sidebar Layout Adjustment */
+
+/* The top section (Media Pool) */
+.media-pool-section {
+    flex: 0 0 40%; /* Initial height */
+    min-height: 150px;
+    display: flex;
+    flex-direction: column;
+    border-bottom: 1px solid var(--vada-border);
+}
+
+/* THE RESIZER BAR */
+.sidebar-resizer {
+    height: 6px;
+    background: #1a1a1a;
+    cursor: ns-resize; /* North-South Resize cursor */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+    z-index: 100;
+}
+
+.sidebar-resizer:hover {
+    background: var(--vada-accent);
+}
+
+.sidebar-resizer::after {
+    content: '';
+    width: 30px;
+    height: 2px;
+    background: #333;
+    border-radius: 2px;
+}
+
+/* The bottom section (Control Center / Inspector) */
+.control-deck-section {
+    flex: 1; /* Takes up remaining space */
+    overflow-y: auto;
+    padding-bottom: 20px;
+}
+
+/* Custom Salrayworks Dropdown */
+.salray-dropdown {
+    position: relative;
+    width: 100%;
+    cursor: pointer !important;
+    user-select: none;
+    -webkit-app-region: no-drag !important;
+    margin-top: 5px;
+}
+
+.salray-dropdown .dropdown-selected {
+            background: #111;
+            border: 1px solid #444;
+            padding: 8px 12px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-radius: 2px;
+            transition: border-color 0.15s;
+        }
+
+        .salray-dropdown .dropdown-selected:hover { border-color: #00f2ff; }
+        .salray-dropdown .dropdown-selected::after { content: '▼'; font-size: 8px; color: #666; }
+
+        .salray-dropdown .dropdown-options {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            width: 100%;
+            background: #0a0a0a;
+            border: 1px solid #00f2ff;
+            z-index: 10005 !important;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.9);
+            border-radius: 0 0 4px 4px;
+        }
+
+/* THE FIX: Force the parent container to the absolute top of the stacking context ONLY when open */
+.salray-dropdown.open {
+    z-index: 99999;
+}
+
+.dropdown-selected {
+    padding: 10px 0;
+    font-size: 14px;
+    color: #fff;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: border-color 0.2s;
+}
+
+.dropdown-selected::after {
+    content: '▼';
+    font-size: 8px;
+    color: var(--vada-accent);
+    transition: transform 0.3s;
+}
+
+.salray-dropdown.open .dropdown-selected {
+    border-color: var(--vada-accent);
+}
+
+.salray-dropdown.open .dropdown-selected::after {
+    transform: rotate(180deg);
+}
+
+.dropdown-options {
+    position: absolute;
+    top: calc(100% + 5px);
+    left: -10px;
+    right: -10px;
+    background: #151515;
+    border: 1px solid var(--vada-accent);
+    border-radius: 4px;
+    display: none;
+    flex-direction: column;
+    /* THE FIX: Overpower the 10001 !important tag on the guidelines dropdown */
+    z-index: 99999 !important; 
+    box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+    overflow: hidden;
+}
+
+.salray-dropdown.open .dropdown-options {
+    display: block;
+}
+
+.salray-dropdown .option {
+            padding: 10px 12px;
+            cursor: pointer;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            transition: background 0.1s;
+        }
+
+        .salray-dropdown .option:hover { background: rgba(0, 242, 255, 0.15); color: #fff; }
+        .salray-dropdown .option.active { color: #00f2ff; background: rgba(0, 242, 255, 0.05); font-weight: bold; }
+
+.option {
+    padding: 12px 15px;
+    font-size: 11px;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    transition: all 0.2s;
+}
+
+.option:hover {
+    background: rgba(0, 240, 255, 0.1);
+    color: #fff;
+    padding-left: 20px;
+}
+
+.option.active {
+    color: var(--vada-accent);
+    background: rgba(0, 240, 255, 0.05);
+}
+
+/* 9-Point Transform Handles */
+.transform-nodes {
+    position: absolute;
+    inset: -5px;
+    pointer-events: none;
+    display: none; /* Only show on active/hover */
+}
+
+.video-layer.active .transform-nodes,
+.video-layer:hover .transform-nodes {
+    display: block;
+}
+
+.node {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    background: #000;
+    border: 2px solid var(--vada-accent);
+    pointer-events: auto;
+    z-index: 1000;
+}
+
+/* Position Handles */
+.nw { top: 0; left: 0; cursor: nw-resize; }
+.n  { top: 0; left: 50%; transform: translateX(-50%); cursor: n-resize; }
+.ne { top: 0; right: 0; cursor: ne-resize; }
+.w  { top: 50%; left: 0; transform: translateY(-50%); cursor: w-resize; }
+.e  { top: 50%; right: 0; transform: translateY(-50%); cursor: e-resize; }
+.sw { bottom: 0; left: 0; cursor: sw-resize; }
+.s  { bottom: 0; left: 50%; transform: translateX(-50%); cursor: s-resize; }
+.se { bottom: 0; right: 0; cursor: se-resize; }
+
+/* Custom Context Menu */
+#contextMenu {
+    position: fixed;
+    display: none;
+    background: #111;
+    border: 1px solid var(--vada-accent);
+    width: 180px;
+    z-index: 10000;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    padding: 5px 0;
+}
+
+.ctx-item {
+    padding: 8px 15px;
+    font-size: 10px;
+    color: #ccc;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.ctx-item:hover {
+    background: var(--vada-accent);
+    color: #000;
+}
+
+.ctx-divider {
+    height: 1px;
+    background: var(--vada-border);
+    margin: 5px 0;
+}
+
+/* Hide handles when locked */
+.video-layer.is-locked .transform-nodes {
+    display: none !important;
+}
+
+/* Optional: Visual cue for locked layers */
+.video-layer.is-locked {
+    border-color: #ff4444 !important; /* Red border for locked */
+    cursor: not-allowed !important;
+}
+
+/* Rotation Handle Styles */
+/* THE UNIVERSAL ROTATION ICON */
+.rotate-node {
+    position: absolute;
+    top: -45px; 
+    left: 50%;
+    transform: translateX(-50%);
+    width: 20px;
+    height: 20px;
+    background: transparent;
+    cursor: alias; 
+    pointer-events: auto;
+    z-index: 1005;
+    transition: all 0.2s;
+}
+
+/* The Curved Arrow Body */
+.rotate-node::after {
+    content: '';
+    position: absolute;
+    inset: 2px;
+    border: 1.5px solid var(--vada-accent);
+    border-radius: 50%;
+    border-top-color: transparent; /* Creates the gap in the circle */
+    transform: rotate(45deg);
+}
+
+/* The Arrow Head */
+.rotate-node::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 0;
+    height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 6px solid var(--vada-accent);
+    transform: rotate(-45deg);
+}
+
+/* The Slim Connection Line (Antenna) */
+.rotate-node-line {
+    position: absolute;
+    bottom: -25px; /* Adjust to meet the top node */
+    left: 50%;
+    width: 1px;
+    height: 25px;
+    background: linear-gradient(to top, var(--vada-accent), transparent);
+    transform: translateX(-50%);
+    pointer-events: none;
+}
+
+.rotate-node:hover {
+    filter: drop-shadow(0 0 5px var(--vada-accent));
+    transform: translateX(-50%) scale(1.15);
+}
+
+/* RESET BUTTON DESIGN */
+/* Sidebar Container Fix */
+aside.sidebar-right {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+/* SMALLER, DISCREET RESET BUTTON */
+.btn-danger-mini {
+    width: 100%;
+    padding: 8px; 
+    background: transparent;
+    border: 1px solid #331111; /* Subtle dark red border */
+    border-radius: 4px;
+    color: #663333; /* Dimmed text */
+    text-transform: uppercase;
+    font-size: 8px; /* Small font size */
+    font-weight: bold;
+    letter-spacing: 2px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+/* WARNING HOVER STATE */
+.btn-danger-mini:hover {
+    background: #ff4444; /* Bright Red on Hover */
+    color: #000;         /* High contrast black text */
+    border-color: #ff4444;
+    box-shadow: 0 0 15px rgba(255, 68, 68, 0.3);
+}
+
+/* PERSISTENT NODES ON LOCK (AS REQUESTED) */
+.video-layer.is-locked .node,
+.video-layer.is-locked .rotate-node {
+    display: block !important; /* Force visibility even when locked */
+    opacity: 0.3;              /* Dimmed appearance */
+    border-color: #ff4444;     /* Red tint to show lock status */
+    cursor: not-allowed;       /* Visual cue that it won't move */
+}
+
+/* Adjust the rotation arrow colors specifically for locked state */
+.video-layer.is-locked .rotate-node::after,
+.video-layer.is-locked .rotate-node::before {
+    border-color: #ff4444;
+    border-top-color: transparent;
+}
+.video-layer.is-locked .rotate-node::before {
+    border-top-color: #ff4444;
+}
+
+.chroma-video-preview video {
+    /* ... existing object-fit: cover; ... */
+    
+    /* CRITICAL: Ensures it rotates around the center regardless of scale */
+    transform-origin: center center;
+    
+    /* Prevents the 'jitter' during hardware acceleration */
+    
+    backface-visibility: hidden;
+    perspective: 1000px;
+}
+
+#v-preview, #v-program, .chroma-video-preview video {
+    /* Force the anchor point to the dead center */
+    transform-origin: center center !important;
+    
+    /* Hardware acceleration to prevent "shaking" or "jagged edges" during rotation */
+    will-change: transform;
+    transform-style: preserve-3d;
+    backface-visibility: hidden;
+}
+
+.moveable-source {
+    transform-origin: center center !important;
+    /* Force GPU rendering to stop sub-pixel jumping */
+    will-change: transform, width, height;
+    transform-style: preserve-3d;
+    backface-visibility: hidden;
+}
+
+/* Ensure these start hidden until enterWorkspace() is called */
+#lockSection, 
+#resetSection, 
+#inspectorPanel {
+    display: none;
+}
+
+/* ==========================================================================
+   WARP ENGINE: FIGMA-STYLE MESH EDITOR
+   ========================================================================== */
+
+/* The main corner points (Vertices) */
+.warp-dot {
+    width: 14px !important;
+    height: 14px !important;
+    background: #ffffff !important;
+    border: 2px solid #00f0ff !important; /* Force Cyan */
+    position: absolute !important;
+    border-radius: 50% !important;
+    z-index: 999999 !important; 
+    cursor: move !important;
+    display: block !important;
+    pointer-events: auto !important;
+}
+.warp-dot:hover {
+    background: var(--vada-accent);
+}
+
+/* Ensure the dots are prioritized by the mouse */
+.warp-dot, .tangent {
+    pointer-events: auto !important;
+    z-index: 99999 !important;
+}
+
+/* Specific Corner Positions */
+.warp-dot.tl { top: -6px; left: -6px; }
+.warp-dot.tr { top: -6px; right: -6px; }
+.warp-dot.bl { bottom: -6px; left: -6px; }
+.warp-dot.br { bottom: -6px; right: -6px; }
+
+/* Tangent Handles - The Curve Controllers */
+.tangent {
+    width: 12px !important;
+    height: 12px !important;
+    background: #00f0ff !important;
+    border: 2px solid #ffffff !important;
+    position: absolute !important;
+    border-radius: 50% !important;
+    z-index: 999999 !important;
+    cursor: crosshair !important;
+    display: block !important;
+    pointer-events: auto !important;
+}
+
+.tangent:hover {
+    background: #ffffff;
+    box-shadow: 0 0 8px var(--vada-accent);
+    transform: scale(1.2);
+}
+
+/* Position them specifically so they aren't hidden under the corner */
+.t-left { left: -40px !important; top: 0px !important; }
+.t-right { right: -40px !important; top: 0px !important; }
+
+/* The visual connection arm */
+.tangent::before {
+    content: '' !important;
+    position: absolute !important;
+    height: 2px !important;
+    background: rgba(0, 240, 255, 0.8) !important;
+    top: 5px !important;
+    width: 40px !important;
+    z-index: -1 !important;
+}
+.t-left::before { left: 10px !important; }
+.t-right::before { right: 10px !important; }
+
+/* ==========================================================================
+   ACTIVE VISUAL STATES
+   ========================================================================== */
+   .video-layer {
+    position: absolute;
+    /* CHANGE THIS: Must be visible to see the dots on the edges */
+    overflow: visible !important; 
+    transform-origin: center center;
+    /* ... rest of your styles ... */
+}
+/* Active Warp State */
+.video-layer.warp-mode {
+    border: 1px dashed rgba(255, 255, 255, 0.8) !important;
+    background: rgba(0, 240, 255, 0.12) !important;
+    cursor: default; /* Change from grab to default when in mesh mode */
+}
+
+/* CRITICAL: Block standard handle nodes during warp mode */
+.video-layer.warp-mode .transform-nodes {
+    display: none !important;
+    pointer-events: none !important;
+}
+
+/* AI Background Removal Feedback */
+.ai-bg-removing {
+    box-shadow: 0 0 30px var(--vada-accent);
+    outline: 2px solid var(--vada-accent);
+    transition: all 0.3s cubic-bezier(0.19, 1, 0.22, 1);
+}
+
+.ai-bg-removing::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom, 
+        transparent 0%, 
+        var(--vada-accent) 50%, 
+        transparent 100%);
+    background-size: 100% 200%;
+    opacity: 0.15;
+    animation: bgScan 2.5s linear infinite;
+    pointer-events: none;
+}
+
+@keyframes bgScan {
+    0% { background-position: 0% -100%; }
+    100% { background-position: 0% 100%; }
+}
+
+
+
+
+.media-sub-flyout {
+    position: fixed;
+    background: #0f0f0f;
+    border: 1px solid var(--vada-accent);
+    min-width: 200px;
+    z-index: 11000;
+    box-shadow: 10px 0 30px rgba(0, 0, 0, 0.8);
+    border-radius: 2px;
+}
+
+.flyout-header {
+    background: rgba(0, 242, 255, 0.1);
+    color: var(--vada-accent);
+    font-size: 9px;
+    padding: 8px 12px;
+    letter-spacing: 1px;
+    border-bottom: 1px solid #222;
+}
+
+.flyout-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 12px;
+    color: #ccc;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.flyout-item:hover {
+    background: #1a1a1a;
+    color: #fff;
+}
+
+.flyout-item .src-add {
+    color: var(--vada-accent);
+    font-weight: bold;
+}
+
+.flyout-item.empty {
+    color: #555;
+    font-style: italic;
+    cursor: default;
+}
+
+.tray-opt {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+
+/* Grid System Background */
+#workspaceView {
+    --grid-size: 25px; /* Base size */
+    --grid-color: rgba(0, 242, 255, 0.08);
+}
+.canvas-stage.grid-active {
+    background-image: 
+        linear-gradient(rgba(0, 242, 255, 0.1) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 242, 255, 0.1) 1px, transparent 1px);
+    background-size: 25px 25px; /* Represents 100px physical units */
+    background-position: center;
+}
+
+#workspaceView.grid-100, #workspaceView.grid-200, #workspaceView.grid-400 {
+    background-image: 
+        linear-gradient(var(--grid-color) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+    /* The size and position are handled by JavaScript for perfect sync */
+    background-repeat: repeat;
+}
+
+/* 무한 연장 삼분할 가이드라인 */
+#workspaceView.grid-thirds {
+    background-image: 
+        /* 가로 선 2개 */
+        linear-gradient(var(--grid-color) 1px, transparent 1px),
+        linear-gradient(var(--grid-color) 1px, transparent 1px),
+        /* 세로 선 2개 */
+        linear-gradient(90deg, var(--grid-color) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+    background-repeat: no-repeat;
+    /* 위치는 JS에서 계산하여 주입 */
+}
+
+/* Custom Dropdown Styling */
+.guideline-dropdown {
+    position: relative;
+    display: inline-block;
+}
+.guideline-content {
+    display: none;
+    position: absolute;
+    background: #111;
+    border: 1px solid var(--vada-accent);
+    min-width: 160px;
+    z-index: 10000;
+    box-shadow: 0 8px 16px rgba(0,0,0,0.5);
+}
+.guideline-dropdown:hover .guideline-content { display: block; }
+.guideline-opt {
+    padding: 8px 12px;
+    color: #ccc;
+    cursor: pointer;
+    font-size: 11px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.guideline-opt:hover { background: rgba(0, 242, 255, 0.1); color: #fff; }
+.guideline-opt.active { color: #00f2ff; background: rgba(0, 242, 255, 0.05); }
+.guideline-opt.active::after { content: '✓'; }
+
+
+
+/* Force rotation handle to show on monitors even when not hovered */
+.screen-layer .rotate-node {
+    display: block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+
+#closeBtn {
+    /* 1. Force a standard font so symbols don't get mapped to icons */
+    font-family: "Segoe UI", Arial, sans-serif !important;
+    
+    /* 2. Remove any font-smoothing that might distort icons */
+    -webkit-font-smoothing: antialiased;
+    
+    /* 3. Standard button styling */
+    width: 45px;
+    height: 30px;
+    background: transparent;
+    color: white;
+    border: none;
+    font-size: 18px;
+    font-weight: normal;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    -webkit-app-region: no-drag; /* Makes the button clickable if in a draggable header */
+}
+
+#closeBtn:hover {
+    background-color: #e81123 !important; /* Standard Windows Close Red */
+    color: white !important;
+}
+
+/* Ensure no pseudo-elements are injecting a '4' */
+#closeBtn::before, #closeBtn::after {
+    content: none !important;
+}
+
+.thumb-container { 
+    width: 100%; height: 100%; 
+    display: flex; align-items: center; justify-content: center; 
+    flex-direction: column; pointer-events: none; 
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100% !important;
+    height: 100% !important;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden; /* 삐져나오는 텍스트 강제 절삭 */
+    pointer-events: none; /* 드래그 방해 금지 */
+}
+.thumb-icon { font-size: 32px; margin-bottom: 8px; opacity: 0.7; }
+.thumb-label { 
+    font-family: 'Consolas', 'Monaco', monospace; 
+    font-size: 10px; color: #666; 
+    text-transform: uppercase; letter-spacing: 1px; 
+}
+
+
+/* Enable scrolling in the Gallery View */
+#galleryView {
+    height: 100vh; 
+    overflow-y: auto !important; 
+    padding-bottom: 50px; /* Space so the bottom cards aren't cut off */
+    scroll-behavior: smooth;
+}
+
+/* Professional thin scrollbar for the Gallery and Media Pool */
+#galleryView::-webkit-scrollbar, 
+#mediaPoolList::-webkit-scrollbar {
+    width: 6px;
+}
+
+#galleryView::-webkit-scrollbar-track, 
+#mediaPoolList::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+#galleryView::-webkit-scrollbar-thumb, 
+#mediaPoolList::-webkit-scrollbar-thumb {
+    background: #00f2ff; /* Your VaDA Cyan */
+    border-radius: 10px;
+}
+
+#galleryView::-webkit-scrollbar-thumb:hover {
+    background: #fff;
+}
+
+/* Restores the hover glow for custom network inputs */
+#webrtcUrlInput:hover, #webrtcUrlInput:focus {
+    border-color: var(--vada-accent) !important;
+    background: rgba(0, 242, 255, 0.05) !important;
+}
+
+#webrtc_bg_video {
+    width: 100%;
+    height: 100%;
+    object-fit: fill;
+    z-index: 0;
+    pointer-events: none;
+}
+
+#webrtc-debug-label-inline {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    background: rgba(0,0,0,0.8);
+    color: #00f2ff;
+    font-family: monospace;
+    font-size: 11px;
+    padding: 6px;
+    border-bottom: 1px solid rgba(0, 242, 255, 0.3);
+    z-index: 10;
+    pointer-events: none;
+}
+
+#activeSurface {
+  position: relative;
+  overflow: hidden;
+}
+
+#vada-grid-layer {
+    position: absolute !important;
+    top: 0 !important; 
+    left: 0 !important;
+    width: 7680px !important;  /* Match your 8K canvas width */
+    height: 4320px !important; /* Match your 8K canvas height */
+    z-index: 0 !important;     /* Keep it behind the videos */
+    pointer-events: none !important;
+}
+
+.canvas-stage {
+    position: relative;
+    transform-origin: 0 0; /* Ensures zoom/pan happens from the top-left */
+}
+
+.video-layer {
+    position: absolute;
+    overflow: hidden;
+    
+}
+
+/* 실제 영상/내용물: 비율을 유지하며 무조건 꽉 채움 (Crop) */
+.video-layer .thumb-container, 
+.video-layer video, 
+.video-layer img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    object-position: center !important;
+}
+
+/* 투명한 배경과 하늘색 테두리 */
+        .node { 
+            position: absolute; 
+            width: 12px; 
+            height: 12px; 
+            background: transparent !important; 
+            border: 2px solid #00f2ff !important; 
+            box-sizing: border-box;
+            pointer-events: auto;
+        }
+
+        /* 절반 걸치기 (-6px 오프셋) */
+        .node.nw { top: -6px; left: -6px; cursor: nwse-resize; }
+        .node.n  { top: -6px; left: calc(50% - 6px); cursor: ns-resize; }
+        .node.ne { top: -6px; right: -6px; cursor: nesw-resize; }
+        .node.w  { top: calc(50% - 6px); left: -6px; cursor: ew-resize; }
+        .node.e  { top: calc(50% - 6px); right: -6px; cursor: ew-resize; }
+        .node.sw { bottom: -6px; left: -6px; cursor: nesw-resize; }
+        .node.s  { bottom: -6px; left: calc(50% - 6px); cursor: ns-resize; }
+        .node.se { bottom: -6px; right: -6px; cursor: nwse-resize; }
+
+/* 추가: 선택(active)되었을 때만 노드 보이기 */
+.video-layer.active .transform-nodes {
+    display: block;
+}
+/* --- DOUBLE CLICK: Crop Mode Active Styles --- */
+.video-layer.crop-mode-active {
+            overflow: visible !important; 
+            z-index: 9999 !important; 
+        }
+        .source-ghost-outline {
+            position: absolute;
+            border: 2px dashed #ffffff !important;
+            box-sizing: border-box;
+            pointer-events: none;
+            z-index: -1;
+            /* [그림자 가두기] 어두운 막이 원본 16:9 점선 영역 밖으로 못 나가게 차단 */
+            overflow: hidden !important; 
+        }
+        .source-ghost-hole {
+            position: absolute;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.75);
+            pointer-events: none;
+        }
+
+/* Makes the placeholder instantly transparent when you click into the input */
+.bento-input input:focus::placeholder {
+    color: transparent;
+}
+
+/* ==========================================================================
+   INFRASTRUCTURE "GHOST" MODE
+   ========================================================================== */
+
+/* 1. DEFAULT STATE: Monitors are unclickable guides */
+.screen-layer {
+    pointer-events: none !important; 
+    border: 1px dashed rgba(0, 242, 255, 0.15) !important;
+    background: transparent !important;
+    z-index: 1 !important;
+    transition: all 0.3s ease;
+}
+.screen-layer .transform-nodes,
+.screen-layer .rotate-node { 
+    display: none !important; 
+}
+
+/* 2. INFRASTRUCTURE MODE: Monitors become active, Videos become ghosts */
+body.infra-mode-active .screen-layer {
+    pointer-events: auto !important; 
+    border: 2px dashed #ff00ff !important; 
+    background: repeating-linear-gradient(45deg, rgba(255, 0, 255, 0.05), rgba(255, 0, 255, 0.05) 10px, transparent 10px, transparent 20px) !important;
+    z-index: 9999 !important;
+}
+body.infra-mode-active .screen-layer .transform-nodes,
+body.infra-mode-active .screen-layer .rotate-node { 
+    display: block !important; 
+}
+
+/* 3. The Video Layers dim out when editing infrastructure */
+body.infra-mode-active .video-layer:not(.screen-layer) {
+    pointer-events: none !important; 
+    opacity: 0.15 !important;        
+    filter: grayscale(100%);
+    transition: all 0.3s ease;
+}
+/* Canvas Origin Marker */
+#canvas-origin-marker {
+    position: absolute; 
+    top: 50%; /* Anchor to middle */
+    left: 50%; /* Anchor to middle */
+    z-index: 2; 
+    pointer-events: none; 
+    display: block; 
+}
+
+#canvas-origin-marker::before, #canvas-origin-marker::after {
+    content: ''; position: absolute; background: rgba(0, 242, 255, 0.8);
+}
+
+/* Horizontal line: Span 20,000px (wider than 8K) */
+#canvas-origin-marker::before { 
+    width: 20000px; 
+    height: 1px; 
+    left: -10000px; 
+    top: 0; 
+}
+/* Vertical line: Span 20,000px (taller than 8K) */
+#canvas-origin-marker::after { 
+    width: 1px; 
+    height: 20000px; 
+    left: 0; 
+    top: -10000px; 
+}
+
+/* Visibility Trigger */
+body.dragging-active #canvas-origin-marker {
+    display: block;
+}
+
+/* Metadata Telemetry Tags */
+.source-telemetry {
+    position: absolute;
+    top: 5px;
+    left: 5px;
+    padding: 3px 6px;
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid rgba(0, 242, 255, 0.3);
+    color: #00f2ff;
+    font-family: 'Consolas', monospace;
+    font-size: 8px;
+    pointer-events: none;
+    z-index: 100;
+    border-radius: 2px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.telemetry-line { white-space: nowrap; }
+
+/* .video-layer.is-snapped {
+    border-color: #ffffff !important;
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.6);
+    transition: border-color 0.1s, box-shadow 0.1s;
+} */
+
+/* Highlighter/Glow Effect */
+.edge-snap-line {
+    position: absolute;
+    background: #ff89d2;
+    pointer-events: none;
+    z-index: 100;
+    opacity: 0.5;
+    transition: opacity 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* .edge-snap-line {
+    position: absolute;
+    background: #ff89d2;
+    opacity: 0;
+    transition: opacity 0.1s ease;
+    z-index: 100;
+} */
+
+/* Thinner, glowing edges */
+.edge-top { top: -2px; left: 0; width: 100%; height: 2px; }
+.edge-bottom { bottom: -2px; left: 0; width: 100%; height: 2px; }
+.edge-left { top: 0; left: -2px; width: 2px; height: 100%; }
+.edge-right { top: 0; right: -2px; width: 2px; height: 100%; }
+
+/* The "Highlighter" Glow */
+.edge-snap-line.active { 
+    opacity: 1;
+    box-shadow: 0 0 10px 2px rgba(255, 137, 210, 0.8);
+}
+
+.video-layer.is-transitioning {
+    transition: left 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), 
+                top 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), 
+                width 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), 
+                height 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+
+
+
+
+/* ZUN */
+/* 2. Zen Toggle Button - Reduced size & always visible */
+.zen-toggle-btn {
+    position: fixed;
+    bottom: 270px; /* Aligns with the top of the bottom panel */
+    right: 340px;  /* Aligns to the left of the right panel */
+    width: 32px;   /* Smaller size */
+    height: 32px;
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid var(--vada-accent);
+    color: var(--vada-accent);
+    border-radius: 4px;
+    cursor: pointer;
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px; /* Smaller icon */
+    transition: all 0.4s cubic-bezier(0.19, 1, 0.22, 1);
+    opacity: 0.8;    /* Slight transparency when idle */
+}
+.zen-toggle-btn:hover { opacity: 1; background: var(--vada-accent); color: #000; }
+
+/* 3. Slide Handles - Sleeker and smaller */
+.panel-handle {
+    position: fixed;
+    background: rgba(0, 0, 0, 0.8);
+    border: 1px solid var(--vada-accent);
+    color: var(--vada-accent);
+    display: flex;
+    align-items: center; justify-content: center;
+    cursor: pointer;
+    z-index: 99998;
+    opacity: 0; /* Only visible when hidden */
+    pointer-events: none;
+    transition: all 0.3s ease;
+    font-size: 10px;
+}
+
+.handle-left { left: 0; top: 50%; transform: translateY(-50%); width: 12px; height: 50px; border-left: none; border-radius: 0 4px 4px 0; }
+.handle-right { right: 0; top: 50%; transform: translateY(-50%); width: 12px; height: 50px; border-right: none; border-radius: 4px 0 0 4px; }
+.handle-bottom { bottom: 0; left: 50%; transform: translateX(-50%); width: 50px; height: 12px; border-bottom: none; border-radius: 4px 4px 0 0; }
+
+body.hide-left .handle-left, 
+body.hide-right .handle-right, 
+body.hide-bottom .handle-bottom { opacity: 1; pointer-events: auto; }
+
+/* When classes are added, tell the grid to collapse that specific column */
+body.hide-left .app-container {
+    grid-template-columns: 0px 1fr 320px;
+}
+
+body.hide-right .app-container {
+    grid-template-columns: 280px 1fr 0px;
+}
+
+/* When both are hidden */
+body.hide-left.hide-right .app-container {
+    grid-template-columns: 0px 1fr 0px;
+}
+
+.zen-toggle-btn.zen-mode-active {
+    bottom: 30px;
+    right: 30px;
+}
+
+
+
+
+/* ==========================================================================
+   DYNAMIC EDGE RIDING (Appends to your existing styles)
+   ========================================================================== */
+
+/* 1. When in Full Canvas Mode, ALWAYS keep the handles visible and clickable */
+body.zen-mode .panel-handle {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}
+
+/* 2. When in Full Canvas Mode AND the panel is OPEN, push the handle to the inner edge */
+body.zen-mode:not(.hide-left) .handle-left {
+    left: 280px; 
+}
+
+body.zen-mode:not(.hide-right) .handle-right {
+    right: 320px; 
+}
+
+body.zen-mode:not(.hide-bottom) .handle-bottom {
+    bottom: 250px; 
+}
+
+/* 6. Bottom Handle (Magnetically tracks the dynamic height) */
+.handle-bottom { 
+    /* USE THE LIVE VARIABLE INSTEAD OF 250px */
+    bottom: var(--deck-height, 250px) !important; 
+    
+    left: 50% !important; 
+    margin-left: -25px !important; 
+    width: 50px !important;  
+    height: 12px !important; 
+    border-bottom: none !important; 
+    border-radius: 4px 4px 0 0 !important; 
+}
+
+/* When closed, it still drops to the absolute bottom of the screen */
+body.hide-bottom .handle-bottom {
+    bottom: 0px !important; 
+}
+
+/* 6. Bottom Handle (Physically Locked to the Deck) */
+.handle-bottom { 
+    bottom: 0px !important; /* Anchor it to the absolute bottom of the screen */
+    margin-bottom: var(--deck-height, 250px) !important; /* Push it UP by exactly the deck height */
+    
+    left: 50% !important; 
+    margin-left: -25px !important; 
+    width: 50px !important;  
+    height: 12px !important; 
+    border-bottom: none !important; 
+    border-radius: 4px 4px 0 0 !important; 
+    
+    /* CRITICAL: Only transition the margin so it physically locks with the deck */
+    transition: margin-bottom 0.4s cubic-bezier(0.19, 1, 0.22, 1), opacity 0.3s ease !important;
+}
+
+body.hide-bottom .handle-bottom {
+    margin-bottom: 0px !important; /* Drops instantly in perfect sync with the deck */
+}
+
+/* 7. Bottom Deck (CSS Driven Slide) */
+#bottomControlDeck {
+    /* Animate the exact same property with the exact same bezier curve */
+    transition: margin-bottom 0.4s cubic-bezier(0.19, 1, 0.22, 1) !important;
+}
+
+body.hide-bottom #bottomControlDeck {
+    /* CSS pushes the deck perfectly out of frame */
+    margin-bottom: calc(-1 * var(--deck-height, 250px)) !important;
+}
+
+/* ==========================================================================
+   FULL SCREEN MODE SLIVER FIX
+   ========================================================================== */
+/* When the panels collapse, force them to hide overflow and fade out completely */
+
+body.hide-left .sidebar-left {
+    opacity: 0 !important;
+    overflow: hidden !important;
+    pointer-events: none !important;
+}
+
+body.hide-right .sidebar-right {
+    opacity: 0 !important;
+    overflow: hidden !important;
+    pointer-events: none !important;
+}
+
+/* ==========================================================================
+   WORKSPACE TELEMETRY HUD (STRUCTURAL SUB-HEADER)
+   ========================================================================== */
+#selectedSourceInfo {
+    /* 1. Structural Layout (NO absolute positioning!) */
+    position: relative !important;
+    width: 100% !important;
+    height: 30px !important; /* The physical height of the bar */
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    z-index: 1000 !important;
+
+    /* 2. Visual Styling */
+    background: rgb(17, 17, 20, .8) !important;
+    /* border-bottom: 1px solid var(--vada-accent) !important; */
+    border-top: 1px solid rgba(255,255,255,0.05) !important; /* Subtle separator */
+
+    /* 3. Typography (Not All-Caps) */
+    font-family: 'Segoe UI', monospace !important;
+    font-weight: 400 !important;
+    font-size: 11px !important;
+    letter-spacing: 0.5px !important;
+    color: #00f2ff !important;
+    text-transform: none !important; /* Keeps the text exactly as written */
+    pointer-events: none !important;
+
+    /* 4. Smooth Height Collapse */
+    overflow: hidden !important;
+    transition: height 0.2s cubic-bezier(0.19, 1, 0.22, 1), opacity 0.2s ease !important;
+    opacity: 1 !important;
+    transition: opacity 0.2s ease, height 0.3s cubic-bezier(0.19, 1, 0.22, 1), font-size 0.3s ease !important;
+}
+
+/* 5. Magically vanish when empty */
+#selectedSourceInfo:empty {
+    height: 0px !important;
+    opacity: 0 !important;
+    border: none !important;
+}
+
+/* ==========================================================================
+   ZEN MODE / FULL SCREEN HUD SCALING
+   ========================================================================== */
+body.zen-mode #selectedSourceInfo {
+    height: 45px !important;       /* ~1.5x taller */
+    font-size: 16px !important;    /* ~1.5x bigger font */
+    letter-spacing: 1px !important; /* Slightly wider spacing for the larger font */
+}

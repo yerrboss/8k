@@ -1,0 +1,28 @@
+{
+  "name": "wall-screen-8k-ui",
+  "version": "1.0.4",
+  "description": "Salrayworks VaDA 8K Video Wall UI",
+  "author": "Salrayworks",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win"
+  },
+  "build": {
+    "appId": "com.salrayworks.vada",
+    "productName": "Wall Screen 8K UI",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "portable"
+    }
+  },
+"dependencies": {
+    "fluent-ffmpeg": "latest"
+  },
+  "devDependencies": {
+    "electron": "latest",
+    "electron-builder": "latest"
+  }
+}

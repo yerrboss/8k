@@ -1,0 +1,456 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Salrayworks | 8K Core Control</title>
+    <link rel="stylesheet" href="style.css" />
+    <script src="adapter-latest.js"></script>
+  </head>
+  <body>
+    
+    <div class="salray-title-bar">
+      <div class="drag-region">
+        <span class="app-id">SALRAYWORKS // 8K CORE v1.0</span>
+      </div>
+      <div class="window-controls">
+        <button id="minBtn">—</button>
+        <button id="maxBtn">▢</button>
+        <button id="closeBtn">×</button>
+      </div>
+    </div>
+
+<div class="app-container" id="mainAppContainer">
+      <aside class="sidebar-left">
+        <div
+          class="media-pool-container"
+          style="display: flex; flex-direction: column; height: 100%"
+        >
+          <div class="panel-header">
+            <h2>Media Pool</h2>
+            <button class="btn-mini-add" title="Add Source">+</button>
+          </div>
+
+          <div
+            class="media-list"
+            id="mediaPoolList"
+            style="flex: 1; padding: 10px; overflow-y: auto"
+          >
+            <div class="media-item active">
+              <div class="media-thumb">NDI</div>
+              <div class="media-meta">
+                <label>8K_MAIN_FEED</label>
+                <span>7680x4320 // 60 FPS</span>
+              </div>
+              <div class="media-status-dot"></div>
+            </div>
+
+            <div class="media-item">
+              <div class="media-thumb">FILE</div>
+              <div class="media-meta">
+                <label>TEST_PATTERN_V01</label>
+                <span>7680x4320 // PRORES</span>
+              </div>
+              <div class="media-status-dot offline"></div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <main class="canvas-area">
+<div id="galleryView">
+  <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center; position: relative;">
+    <h2>Project Gallery</h2>
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <span class="status-tag" id="projectCountTag">0 SAVED</span>
+      <button id="bulkSelectToggleBtn" class="ptz-btn" style="width: auto; padding: 4px 12px; font-size: 10px; border-color: #333;" onclick="toggleBulkSelectMode()">
+        SELECT
+      </button>
+    </div>
+  </div>
+
+  <div class="template-grid"></div>
+
+  <div id="bulkActionTray" style="position: fixed; bottom: -60px; left: 280px; right: 320px; height: 50px; background: #0c0c0f; border-top: 1px solid #00f2ff; display: flex; align-items: center; justify-content: space-between; padding: 0 30px; box-shadow: 0 -10px 30px rgba(0,0,0,0.8); z-index: 9999; transition: bottom 0.3s cubic-bezier(0.19, 1, 0.22, 1);">
+    <span id="bulkSelectionCount" style="font-family: monospace; font-size: 11px; color: #666; text-transform: uppercase;">0 PROJECTS SELECTED</span>
+    <div style="display: flex; gap: 8px;">
+      <button class="ptz-btn" style="width: auto; padding: 6px 15px; font-size: 9px; border-color: #222;" onclick="bulkDuplicateProjects()">DUPLICATE</button>
+      <button class="ptz-btn" style="width: auto; padding: 6px 15px; font-size: 9px; border-color: #222;" onclick="bulkExportTopology()">EXPORT JSON</button>
+      <button class="ptz-btn" style="width: auto; padding: 6px 15px; font-size: 9px; border-color: #ff4444; color: #ff4444;" onclick="bulkDeleteProjects()">DELETE SELECTED</button>
+    </div>
+  </div>
+</div>
+        <div
+          id="workspaceView"
+          style="display: none; height: 100%; flex-direction: column"
+        >
+          <div
+            class="canvas-viewport"
+            style="
+              flex: 2;
+              position: relative;
+              display: flex;
+              flex-direction: column;
+              overflow: hidden;
+            "
+          >
+            <div
+              class="panel-header"
+              style="
+                background: rgba(0, 0, 0, 0.3);
+                border-bottom: 1px solid var(--vada-border);
+                display: grid;
+                grid-template-columns: 1fr auto 1fr;
+                align-items: center;
+                padding: 10px 20px;
+              "
+            >
+            
+              <div style="display: flex; align-items: center; gap: 15px">
+                <button id="backBtn" class="btn-chevron-back">‹</button>
+                <div
+                  style="
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: center;
+                    border-left: 1px solid #333;
+                    padding-left: 15px;
+                    height: 24px;
+                  "
+                >
+                  <span
+                    id="liveRes"
+                    style="
+                      font-size: 11px;
+                      color: var(--vada-accent);
+                      opacity: 0.9;
+                      font-family: monospace;
+                      letter-spacing: 1px;
+                    "
+                    >7680 x 4320</span
+                  >
+                </div>
+              </div>
+              <div style="text-align: center">
+                <h2
+                  id="activeTaskName"
+                  style="
+                    color: #eee;
+                    letter-spacing: 3px;
+                    font-weight: 500;
+                    margin: 0;
+                    text-transform: uppercase;
+                  "
+                >
+                  ACTIVE: STANDARD 8K
+                </h2>
+              </div>
+              <div
+                style="
+                  display: flex;
+                  justify-content: flex-end;
+                  align-items: center;
+                "
+              >
+                <span class="status-tag active-pulse">LIVE</span>
+              </div>
+            </div>
+            
+<div id="selectedSourceInfo" style="color: var(--vada-accent); font-family: Segoe UI;"></div>
+            
+<div class="canvas-stage" style="flex: 1; position: relative">
+  
+            <div class="grid-dots"></div>
+            
+            <div id="activeSurface" class="video-layer" style="overflow: hidden; display: flex; flex-direction: column;">
+              
+              
+              <video id="webrtc_bg_video" autoplay playsinline muted style="width:100%; height:100%; object-fit:fill; position:absolute; top:0; left:0; z-index:0; pointer-events:none;"></video>
+              
+              <div id="webrtc-debug-label-inline" style="position:absolute; top:0; left:0; width:100%; background:rgba(0,0,0,0.8); color:#00f2ff; font-family:monospace; font-size:10px; padding:6px; border-bottom:1px solid rgba(0, 242, 255, 0.3); z-index:10; pointer-events:none;">
+                  CANVAS SYNC: DISCONNECTED
+              </div>
+
+              <div class="layer-info" style="position:relative; z-index:11; pointer-events:none;">8K_CORE_PROXIMITY</div>
+              <div class="transform-nodes" style="z-index:12;">
+                <div class="rotate-node"></div>
+                <div class="node nw"></div><div class="node n"></div><div class="node ne"></div>
+                <div class="node w"></div><div class="node e"></div>
+                <div class="node sw"></div><div class="node s"></div><div class="node se"></div>
+              </div>
+
+            </div> 
+
+                        </div> <button id="zenModeToggle" class="zen-toggle-btn" onclick="window.toggleSlidePanel('all')" title="Toggle Canvas Mode">
+                ⛶
+            </button>
+            <div class="panel-handle handle-left" onclick="window.toggleSlidePanel('left')">›</div>
+            <div class="panel-handle handle-right" onclick="window.toggleSlidePanel('right')">‹</div>
+            <div class="panel-handle handle-bottom" onclick="window.toggleSlidePanel('bottom')">⌃</div>
+
+<div id="canvasResizer" class="sidebar-resizer horizontal" style="position: relative; z-index: 9000;"></div>
+
+<div class="control-deck" id="bottomControlDeck" style="height: 250px; background: var(--vada-panel); position: relative; z-index: 9000; box-shadow: 0 -10px 30px rgba(0,0,0,0.8);">
+          >
+            <div class="panel-header">
+              <h2>Canvas Control Deck</h2>
+              <div class="deck-tabs">
+                <button class="tab-mini active">Mapping</button>
+                <button class="tab-mini">Color</button>
+                <button class="tab-mini">NDI Config</button>
+              </div>
+            </div>
+            <div class="deck-content">
+              <div class="bento-input mini">
+                <label>X Offset</label
+                ><input type="number" value="0" id="posX" />
+              </div>
+              <div class="bento-input mini">
+                <label>Y Offset</label
+                ><input type="number" value="0" id="posY" />
+              </div>
+              <div class="bento-input mini">
+                  <label>Rotation</label>
+                  <input type="number" value="0" id="posRot" placeholder="0-359" />
+              </div>
+              <div class="bento-input mini">
+                <label>Scale Factor</label
+                ><input type="number" value="1.0" step="0.1" id="posScale" />
+              </div>
+
+            <div class="bento-input mini">
+              <label>Global X-Offset</label>
+              <input type="number" id="globalOffsetX" value="0" />
+            </div>
+            <div class="bento-input mini">
+              <label>Global Y-Offset</label>
+              <input type="number" id="globalOffsetY" value="0" />
+            </div>
+            
+
+            </div>
+          </div>
+        </div>
+        <div class="scan-bar"></div>
+      </main>
+
+      <aside class="sidebar-right">
+<div id="architectPanel">
+  <div class="panel-header">
+    <h2>Project Manager</h2>
+    <span class="status-tag" id="canvasStatus">DRAFT</span>
+  </div>
+  <div class="bento-input">
+    <label>Project Name</label>
+   <input type="text" id="projName" placeholder="New_Broadcast_01" />
+  </div>
+  <div class="bento-input">
+    <label>Canvas Width</label>
+    <input type="number" id="canvasW" value="7680" />
+  </div>
+  <div class="bento-input">
+    <label>Canvas Height</label>
+    <input type="number" id="canvasH" value="4320" />
+  </div>
+  <div style="padding: 10px 20px">
+    <button class="btn-primary-action" onclick="createNewProject()">
+      CREATE NEW PROJECT
+    </button>
+  </div>
+</div>
+
+        <div id="inspectorPanel" style="display: none" class="fade-in-vada">
+          <div class="panel-header">
+            <h2 id="inspectorTitle">Inspector</h2>
+            <button
+              id="exitInspBtn"
+              class="btn-vada"
+              style="margin: 0; padding: 4px 8px; font-size: 8px; width: auto"
+            >
+              EXIT
+            </button>
+          </div>
+
+  <div class="lock-container" style="display: none; justify-content: space-between; background: rgba(255, 255, 255, 0.03); padding: 8px; border-radius: 4px;">
+    <span style="font-size: 10px; color: #aaa">REMOVE BACKGROUND</span>
+    <input type="checkbox" id="bgRemovalToggle" onchange="window.toggleBgRemoval(this.checked)" />
+  </div>
+
+  <div class="guideline-dropdown">
+    <button class="ptz-btn" style="padding: 5px 15px; font-size: 11px; border-color: #444">
+      GUIDELINES ▾
+    </button>
+    <div class="guideline-content">
+      <div class="guideline-opt active" data-value="off" onclick="window.setGuideline('off')">None</div>
+      <div class="guideline-opt" data-value="100" onclick="window.setGuideline('100')">100px Grid (Fine)</div>
+      <div class="guideline-opt" data-value="200" onclick="window.setGuideline('200')">200px Grid (Standard)</div>
+      <div class="guideline-opt" data-value="400" onclick="window.setGuideline('400')">400px Grid (Coarse)</div>
+      <div style="border-top: 1px solid #333; margin: 5px 0"></div>
+      <div class="guideline-opt" data-value="thirds" onclick="window.setGuideline('thirds')">Rule of Thirds</div>
+    </div>
+  </div>
+</div>
+
+<div id="layoutSection" style="padding: 10px 0; border-top: 1px solid #222; margin: 10px 20px 0 20px;">
+            <span style="font-size: 9px; color: #666; letter-spacing: 1.5px; display: block; margin-bottom: 10px;">LAYOUT PRESETS</span>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-bottom: 10px;">
+                <button class="ptz-btn" style="font-size:10px; padding:6px; border-color:#444;" onclick="recallLayout(1)">P1</button>
+                <button class="ptz-btn" style="font-size:10px; padding:6px; border-color:#444;" onclick="recallLayout(2)">P2</button>
+                <button class="ptz-btn" style="font-size:10px; padding:6px; border-color:#444;" onclick="recallLayout(3)">P3</button>
+                <button class="ptz-btn" style="font-size:10px; padding:6px; border-color:#444;" onclick="recallLayout(4)">P4</button>
+                <button class="ptz-btn" style="font-size:10px; padding:6px; border-color:#444;" onclick="recallLayout(5)">P5</button>
+                <button class="ptz-btn" style="font-size:11px; padding:6px; border-color:#444;" onclick="recallLayout(6)">P6</button>
+            </div>
+        </div>
+
+        <div id="quickLayoutSection" style="padding: 10px 20px; border-top: 1px solid #222;">
+            <span style="font-size: 9px; color: #666; letter-spacing: 1.5px; display: block; margin-bottom: 10px;">QUICK BROADCAST GRID</span>
+            <div id="presetContainer" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px;"></div>
+        </div>
+
+        <div id="monitorSetupSection" style="display: none; padding: 10px 20px; border-top: 1px solid #222;">
+            <span style="font-size: 9px; color: #ff00ff; letter-spacing: 1.5px; display: block; margin-bottom: 10px; font-weight: bold;">HARDWARE MONITOR SETUP</span>
+            <div style="display: flex; gap: 5px; margin-bottom: 10px;">
+                <div class="bento-input mini" style="margin:0;"><label>Phys Width</label><input type="number" id="monW" /></div>
+                <div class="bento-input mini" style="margin:0;"><label>Phys Height</label><input type="number" id="monH" /></div>
+            </div>
+            <div style="display: flex; gap: 5px; margin-bottom: 10px;">
+                <div class="bento-input mini" style="margin:0;"><label>Global X</label><input type="number" id="monX" /></div>
+                <div class="bento-input mini" style="margin:0;"><label>Global Y</label><input type="number" id="monY" /></div>
+            </div>
+    
+            <!-- <div style="display: flex; gap: 5px; margin-bottom: 10px;">
+                <div class="bento-input mini"><label>Global Rotation</label><input type="number" value="0" id="globalRot" placeholder="0-359" /></div>
+                <div class="bento-input mini"><label>Global Scale</label><input type="number" value="1.0" id="globalScale" step="0.01" /></div>
+            </div> -->
+
+
+            <button class="btn-vada" style="padding: 12px; width: 100%; border-color: #ff00ff; color: #ff00ff; margin-top: 5px;" onclick="applyMonitorSetup()">
+                PUSH SETUP TO ENGINE
+            </button>
+        </div>
+
+        <div id="workspaceActionButtons" style="padding: 0 20px 20px 20px; display: flex; gap: 5px; margin-top: 15px;">
+            <button class="btn-vada" style="flex: 2; font-size: 10px; padding: 8px;" onclick="saveLayout(lastActivePreset)">SAVE CURRENT (P<span id="activeSlotNum">1</span>)</button>
+            <button class="btn-danger-mini" style="flex: 1; padding: 8px; font-size: 10px;" onclick="hardResetWorkspace()">RESET</button>
+        </div>
+
+      <div style="margin-top: auto"></div>
+
+      <div id="infraContainer" style="padding: 0 20px 20px 20px; display: none;">
+        <button id="infraToggleBtn" class="btn-vada" style="width: 100%; border-color: #ff00ff; color: #ff00ff;" onclick="toggleInfrastructureMode()">
+          EDIT INFRASTRUCTURE
+        </button>
+      </div>
+
+
+<!-- <div id="networkSection" style="padding: 10px 0; border-top: 1px solid #222; margin: 10px 20px;">
+    <span style="font-size: 9px; color: #666; letter-spacing: 1.5px; display: block; margin-bottom: 10px;">SIGNALING SERVER</span>
+    <div style="display: flex; gap: 5px;">
+        <input type="text" id="webrtcUrlInput" 
+               class="vada-input-field"
+               style="flex: 3; background: #111; border: 1px solid #444; color: #00f2ff; font-family: monospace; font-size: 10px; padding: 10px; border-radius: 8px; width: 0; min-width: 0; outline: none;" 
+               placeholder="ws://192.168.0.168:8081">
+        <button class="ptz-btn" 
+                style="flex: 1.2; font-size: 10px; padding: 6px; border-radius: 8px;" 
+                onclick="updateWebRTCUrl(document.getElementById('webrtcUrlInput').value)">
+                APPLY
+        </button>
+    </div>
+</div> -->
+
+          </div>
+        </div>
+
+<div id="lockSection" style="display: block; padding: 0 20px 10px 20px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255, 255, 255, 0.03); padding: 12px 15px; border-radius: 4px; border: 1px solid rgba(255, 255, 255, 0.05);">
+              <span style="font-family: monospace; font-size: 11px; color: #aaa; letter-spacing: 1px;">LOCK ALL SOURCES</span>
+              <label class="switch" style="position: relative; display: inline-block; width: 34px; height: 18px;">
+                  <input type="checkbox" id="lockToggle" style="opacity: 0; width: 0; height: 0;">
+                  <span class="slider" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #444; transition: .2s; border-radius: 18px;"></span>
+              </label>
+          </div>
+        </div>
+
+        <style>
+            .switch input:checked + .slider { background-color: #ff4444; box-shadow: 0 0 10px rgba(255, 68, 68, 0.5); }
+            .switch input:checked + .slider:before { transform: translateX(16px); }
+            .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 2px; bottom: 2px; background-color: white; transition: .2s; border-radius: 50%; }
+        </style>
+
+        <div style="margin-top: auto"></div>
+
+        <div style="padding-bottom: 10px">
+          <div
+            id="resetSection"
+            style="display: none; padding: 0 20px 10px 20px"
+          >
+            <button
+              class="btn-danger-mini"
+              onclick="window.hardResetWorkspace()"
+            >
+              RESET CONFIGURATION
+            </button>
+          </div>
+
+          <div style="padding: 0 20px 20px 20px">
+            <button
+              class="btn-vada"
+              style="width: 100%"
+              onclick="toggleScanner()"
+            >
+              RUN SPATIAL SCAN
+            </button>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+        </div>
+
+    <div id="ipSetupView" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(5, 5, 5, 0.95); z-index:99999; flex-direction:column; align-items:center; justify-content:center; backdrop-filter: blur(15px);">
+        
+        <div class="setup-card" style="padding:40px; border:1px solid #00f2ff; background:#000; display:flex; flex-direction:column; gap:20px; align-items:center;">
+            <h2 style="color:#00f2ff; font-family:monospace; letter-spacing:2px;">ENGINE DISCONNECTED</h2>
+            <p style="color:#666; font-size:12px;">ENTER HARDWARE RACK IP ADDRESS</p>
+            
+            <input type="text" id="ipInput" placeholder="127.0.0.1" 
+                   style="background:#111; border:1px solid #333; color:#fff; padding:10px; width:250px; text-align:center; font-family:monospace;">
+            
+            <button onclick="updateIP()" 
+                    style="background:#00f2ff; color:#000; border:none; padding:10px 30px; font-weight:bold; cursor:pointer; width:100%;">
+                CONNECT TO ENGINE
+            </button>
+        </div>
+    </div>
+
+<div id="sourceTray" class="source-tray">
+      <div class="tray-header"><span>IMPORT ENGINE</span></div>
+      <div class="tray-options">
+        <div class="tray-opt" data-type="NDI">NDI® STREAM <span>›</span></div>
+        <div class="tray-opt" data-type="WEBRTC">WEBRTC P2P <span>›</span></div>
+        <div class="tray-opt" data-type="FILE">LOCAL FILE <span></span></div>
+        <div class="tray-opt" data-type="LIVE">LIVE CAPTURE <span>›</span></div>
+      </div>
+    </div>
+
+    <div id="mediaFlyout" class="media-sub-flyout" style="display: none"></div>
+
+    <div id="contextMenu" class="salray-ctx">
+      <div class="ctx-item" id="ctxFront">Bring to Front</div>
+      <div class="ctx-item" id="ctxBack">Send to Back</div>
+      <div class="ctx-divider"></div>
+      <div class="ctx-item" id="ctxLock">Lock Layer</div>
+      <div class="ctx-item" id="ctxUnlock" style="display: none">
+        Unlock Layer
+      </div>
+      <div class="ctx-divider"></div>
+      <div class="ctx-item" id="ctxReset">Reset Transform</div>
+      <div class="ctx-item" id="ctxDeleteChannel" style="color: #ff4444">Delete Channel</div>
+      <div class="ctx-item" id="ctxDelete" style="color: #ff4444" onmousedown="window.forceContextMenuDelete(event)" onclick="window.forceContextMenuDelete(event)">
+        Delete Source
+      </div>
+    </div>
+
+    <script src="render.js"></script>
+  </body>
+</html>
