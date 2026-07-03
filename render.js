@@ -1836,7 +1836,23 @@ async function assignSourceToChannel(channel, hardwareName, sourceUrl, isMediaFi
 
 async function spawnSourceOnCanvas(name, dropX = 150, dropY = 150, forceId = null, srcType = "LIVE", filePath = null, srcIndex = null, forceChannel = null, isSync = false, sourceUrl = "") {
   const stage = document.querySelector(".canvas-stage");
+  const surface = document.getElementById("activeSurface");
   if (!stage) return;
+
+// 1. IMPROVED CENTER-SNAP LOGIC (Clamps to Canvas)
+  if (dropX === null || dropY === null) {
+      const surface = document.getElementById("activeSurface");
+      const surfaceRect = surface.getBoundingClientRect();
+      const stageRect = stage.getBoundingClientRect();
+      
+      // Calculate center point relative to the surface
+      const centerX = (surfaceRect.left - stageRect.left + (surfaceRect.width / 2)) / uiZoom;
+      const centerY = (surfaceRect.top - stageRect.top + (surfaceRect.height / 2)) / uiZoom;
+      
+      // Subtract half of the default element size (480/2=240, 270/2=135) to center it
+      dropX = centerX - 240;
+      dropY = centerY - 135;
+  }
 
   const sIdx = srcIndex !== null && srcIndex !== undefined ? parseInt(srcIndex) : -999;
   let assignedChannel = forceChannel;
@@ -1894,7 +1910,13 @@ async function spawnSourceOnCanvas(name, dropX = 150, dropY = 150, forceId = nul
 
   if (!isSync) {
     selectElement(layer);
-    await assignSourceToChannel(assignedChannel, name, sourceUrl);
+    
+    // ONLY fire add_channel if it is a truly new unregistered source (-999)
+    if (sIdx === -999) {
+        await assignSourceToChannel(assignedChannel, name, sourceUrl, isFile);
+    }
+
+    layer.dataset.lastMoveTime = Date.now() + 3000;
     setTimeout(() => { pushUpdateToHardware(layer, true); }, isFile ? 800 : 200);
   }
 }
@@ -2536,12 +2558,10 @@ function initImportEngine() {
    MEDIA POOL LOGIC & ROUTING ENGINE (UNIFIED HOT-SWAP BARRAGE OVERRIDE)
    ========================================================================== */
 window.executeHotSwap = async (type, name, source, url) => {
-    
-    // --- THE FIX PART 1: THE EVENT SHIELD ---
-    // This perfectly blocks the browser from double-firing the swap command
+    // 1. The Swap Shield (Prevents double-clicking)
     if (window.isSwapping) return;
     window.isSwapping = true;
-    setTimeout(() => window.isSwapping = false, 800); // Locks the engine for 800ms
+    setTimeout(() => window.isSwapping = false, 800);
     
     const isMediaFile = type === "FILE" || name.toLowerCase().endsWith(".mp4");
     const cleanFileName = name.split(/[\\/]/).pop();
@@ -2554,17 +2574,9 @@ window.executeHotSwap = async (type, name, source, url) => {
     if (targetBox && !targetBox.classList.contains("screen-layer")) {
         const channelIndex = targetBox.dataset.channel;
         const isFullState = targetBox.dataset.isFull === "true";
-        console.log(`📡 [Matrix Swap] Target CH ${channelIndex} -> Swapping to: ${cleanFileName}`);
 
         try {
             let actualSourceIndex = source;
-            try {
-                const inputRes = await fetch(getEndpoints().inputs);
-                const inputData = await inputRes.json();
-                const sourceObj = (inputData.input_sources || []).find((s) => s.name === name);
-                if (sourceObj) actualSourceIndex = sourceObj.source;
-            } catch(err) {}
-
             targetBox.dataset.srcIndex = actualSourceIndex;
             targetBox.dataset.srcType = type;
             targetBox.dataset.filePath = name;
@@ -2573,27 +2585,9 @@ window.executeHotSwap = async (type, name, source, url) => {
             const infoTag = targetBox.querySelector(".layer-info");
             if (infoTag) infoTag.innerText = cleanFileName;
 
-            const labelTag = targetBox.querySelector(".layer-label");
-            if (labelTag) { labelTag.innerText = isMediaFile ? "VIDEO FILE" : `LIVE FEED (SRC ${actualSourceIndex})`; }
-
-            const iconTag = targetBox.querySelector(".layer-icon");
-            if (iconTag) iconTag.innerText = isMediaFile ? "🎬" : "📹";
-
-            const bottomBar = targetBox.querySelector("div[style*='bottom:0']");
-            if (bottomBar) {
-                bottomBar.innerHTML = `
-                    <div class="fullscreen-btn" onclick="toggleFullScreen(this, event)" style="cursor:pointer; margin-right:10px; font-size:12px; font-weight:bold; pointer-events: auto; z-index: 99;">${isFullState ? "⤬" : "⛶"}</div>
-                    CH: ${channelIndex} | ID: ${actualSourceIndex}
-                `;
-            }
-
             targetBox.dataset.lastMoveTime = Date.now() + 5000; 
-            
-            // --- THE FIX PART 2: THE HARDWARE ENGINE FIX ---
-            // We removed "assignSourceToChannel" here because telling the hardware 
-            // to "add" a channel that already exists causes it to spawn a giant duplicate.
-            // The forceSyncInterval below is all that is needed to swap the video feed!
 
+            // 2. The Sync Loop (Forces hardware update without adding a new channel)
             let syncCount = 0;
             const forceSyncInterval = setInterval(() => {
                 if (targetBox) {
@@ -2604,17 +2598,14 @@ window.executeHotSwap = async (type, name, source, url) => {
                 if (syncCount >= 5) {
                     clearInterval(forceSyncInterval);
                     syncInspector();
-                    console.log(`🔄 [Matrix Swap Success] Hardware completely forced back into UI bounds.`);
                 }
             }, 500);
 
             activeElement = targetBox;
-        } catch (err) { console.error("Matrix Routing Hot-Swap Failed:", err); }
+        } catch (err) { console.error("Swap Failed:", err); }
     } else {
-        console.log("📡 No target selected. Spawning brand new layer footprint...");
-        const existingLayers = document.querySelectorAll(".video-layer:not(.screen-layer)").length;
-        const staggerOffset = existingLayers * 40;
-        spawnSourceOnCanvas(name, 150 + staggerOffset, 150 + staggerOffset, null, type, name, source, null, false, url);
+        // Spawn brand new
+        spawnSourceOnCanvas(name, null, null, null, type, name, source, null, false, url);
     }
 };
 
