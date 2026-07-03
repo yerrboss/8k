@@ -51,14 +51,44 @@ const BROADCAST_PRESETS = {
     { ch: 2, x: 2560, y: 2160, w: 2560, h: 2160 },
     { ch: 3, x: 5120, y: 2160, w: 2560, h: 2160 },
   ],
-  FOCUS_CENTER: [
-    { ch: 0, x: 1920, y: 1080, w: 3840, h: 2160 },
+FOCUS_CENTER: [
+    // --- 1. THE MAIN CENTER FOCUS ---
+    // Channel 0 becomes a giant 4K screen locked perfectly in the middle
+    { ch: 0, x: 1920, y: 1080, w: 3840, h: 2160 }, 
+
+    // --- 2. TOP BORDER ROW (4 screens) ---
     { ch: 1, x: 0, y: 0, w: 1920, h: 1080 },
     { ch: 2, x: 1920, y: 0, w: 1920, h: 1080 },
     { ch: 3, x: 3840, y: 0, w: 1920, h: 1080 },
-    { ch: 4, x: 5760, y: 1080, w: 1920, h: 1080 },
-    { ch: 5, x: 1920, y: 3240, w: 1920, h: 1080 },
-    { ch: 6, x: 0, y: 1080, w: 1920, h: 1080 },
+    { ch: 4, x: 5760, y: 0, w: 1920, h: 1080 },
+
+    // --- 3. MIDDLE SIDES (Flanking the center) ---
+    { ch: 5, x: 0, y: 1080, w: 1920, h: 1080 },      // Left Top
+    { ch: 6, x: 5760, y: 1080, w: 1920, h: 1080 },   // Right Top
+    { ch: 7, x: 0, y: 2160, w: 1920, h: 1080 },      // Left Bottom
+    { ch: 8, x: 5760, y: 2160, w: 1920, h: 1080 },   // Right Bottom
+
+    // --- 4. BOTTOM BORDER ROW (4 screens) ---
+    { ch: 9, x: 0, y: 3240, w: 1920, h: 1080 },
+    { ch: 10, x: 1920, y: 3240, w: 1920, h: 1080 },
+    { ch: 11, x: 3840, y: 3240, w: 1920, h: 1080 },
+    { ch: 12, x: 5760, y: 3240, w: 1920, h: 1080 },
+  ],
+CLEAN_GRID: [
+    // --- TOP ROW ---
+    { ch: 0, x: 0, y: 0, w: 2560, h: 1440 },
+    { ch: 1, x: 2560, y: 0, w: 2560, h: 1440 },
+    { ch: 2, x: 5120, y: 0, w: 2560, h: 1440 },
+
+    // --- MIDDLE ROW ---
+    { ch: 3, x: 0, y: 1440, w: 2560, h: 1440 },
+    { ch: 4, x: 2560, y: 1440, w: 2560, h: 1440 },
+    { ch: 5, x: 5120, y: 1440, w: 2560, h: 1440 },
+
+    // --- BOTTOM ROW ---
+    { ch: 6, x: 0, y: 2880, w: 2560, h: 1440 },
+    { ch: 7, x: 2560, y: 2880, w: 2560, h: 1440 },
+    { ch: 8, x: 5120, y: 2880, w: 2560, h: 1440 },
   ],
 };
 
@@ -1422,7 +1452,7 @@ el.onpointerdown = (e) => {
         el.classList.add("is-dragging");
         el.dataset.hwLock = "true";
 
-        // --- THE BULLETPROOF TOOLTIP FIX ---
+// --- THE BULLETPROOF TOOLTIP FIX ---
         let tooltip = document.getElementById("vada-drag-tooltip");
         if (!tooltip) {
             tooltip = document.createElement("div");
@@ -1430,7 +1460,26 @@ el.onpointerdown = (e) => {
             tooltip.style.cssText = "position:fixed; background:rgba(0,0,0,0.8); border:1px solid #00f2ff; color:#00f2ff; padding:4px 8px; font-family:monospace; font-size:11px; pointer-events:none; z-index:999999;";
             document.body.appendChild(tooltip);
         }
+        
+        // 1. Make it visible
         tooltip.style.display = "block";
+        
+        // 2. INSTANTLY snap it to the exact click coordinates
+        tooltip.style.left = `${e.clientX + 15}px`;
+        tooltip.style.top = `${e.clientY + 15}px`;
+
+        // 3. INSTANTLY pre-fill the actual data so it doesn't flash empty numbers
+        const initialCurW = Math.round((parseFloat(el.style.width) || el.offsetWidth) / canvasScale);
+        const initialCurH = Math.round((parseFloat(el.style.height) || el.offsetHeight) / canvasScale);
+        const initialCurX = Math.round((parseFloat(el.style.left) || el.offsetLeft) / canvasScale);
+        const initialCurY = Math.round((parseFloat(el.style.top) || el.offsetTop) / canvasScale);
+        const initialRot = Math.round(parseFloat(el.dataset.rotation) || 0);
+
+        tooltip.innerHTML = `
+            <div>X: ${initialCurX} &nbsp; Y: ${initialCurY}</div>
+            <div>W: ${initialCurW} &nbsp; H: ${initialCurH}</div>
+            <div>R: ${initialRot}°</div>
+        `;
 
         const rotateHandle = e.target.closest(".rotate-node");
         const resizeHandle = e.target.closest(".node");
@@ -1793,7 +1842,7 @@ async function spawnSourceOnCanvas(name, dropX = 150, dropY = 150, forceId = nul
   let assignedChannel = forceChannel;
   if (assignedChannel === null) {
     const used = Array.from(document.querySelectorAll(".video-layer:not(.screen-layer)")).map((l) => parseInt(l.dataset.channel));
-    for (let i = 0; i <= 7; i++) {
+    for (let i = 0; i <= 15; i++) {
       if (!used.includes(i)) { assignedChannel = i; break; }
     }
   }
@@ -2057,6 +2106,27 @@ function syncInspector() {
     if (xInput) xInput.value = x;
     if (yInput) yInput.value = y;
     if (rotInput) rotInput.value = rot;
+
+    // --- SYNC COLOR SLIDERS ---
+    const briIn = document.getElementById("colorBri");
+    const briVal = document.getElementById("colorBriVal");
+    const conIn = document.getElementById("colorCon");
+    const conVal = document.getElementById("colorConVal");
+    const satIn = document.getElementById("colorSat");
+    const satVal = document.getElementById("colorSatVal");
+
+    if (briIn) {
+        const b = activeElement.dataset.bri || 100;
+        briIn.value = b; if (briVal) briVal.value = b;
+    }
+    if (conIn) {
+        const c = activeElement.dataset.con || 100;
+        conIn.value = c; if (conVal) conVal.value = c;
+    }
+    if (satIn) {
+        const s = activeElement.dataset.sat || 100;
+        satIn.value = s; if (satVal) satVal.value = s;
+    }
 }
 function setEdgeHighlight(el, edge, active) {
     let line = el.querySelector(`.edge-${edge}`);
@@ -2462,7 +2532,17 @@ function initImportEngine() {
 /* ==========================================================================
    MEDIA POOL LOGIC & ROUTING ENGINE (UNIFIED HOT-SWAP BARRAGE OVERRIDE)
    ========================================================================== */
+/* ==========================================================================
+   MEDIA POOL LOGIC & ROUTING ENGINE (UNIFIED HOT-SWAP BARRAGE OVERRIDE)
+   ========================================================================== */
 window.executeHotSwap = async (type, name, source, url) => {
+    
+    // --- THE FIX PART 1: THE EVENT SHIELD ---
+    // This perfectly blocks the browser from double-firing the swap command
+    if (window.isSwapping) return;
+    window.isSwapping = true;
+    setTimeout(() => window.isSwapping = false, 800); // Locks the engine for 800ms
+    
     const isMediaFile = type === "FILE" || name.toLowerCase().endsWith(".mp4");
     const cleanFileName = name.split(/[\\/]/).pop();
     
@@ -2508,7 +2588,11 @@ window.executeHotSwap = async (type, name, source, url) => {
             }
 
             targetBox.dataset.lastMoveTime = Date.now() + 5000; 
-            await assignSourceToChannel(channelIndex, name, url, isMediaFile);
+            
+            // --- THE FIX PART 2: THE HARDWARE ENGINE FIX ---
+            // We removed "assignSourceToChannel" here because telling the hardware 
+            // to "add" a channel that already exists causes it to spawn a giant duplicate.
+            // The forceSyncInterval below is all that is needed to swap the video feed!
 
             let syncCount = 0;
             const forceSyncInterval = setInterval(() => {
@@ -2620,26 +2704,61 @@ window.recallLayout = async (presetId = 1) => {
   console.log(`📡 Queued Recall for C++ Slot ${hardwareIndex}`);
 };
 
-function applyPresetSmoothly(presetData) {
-    const layers = document.querySelectorAll(".video-layer");
-    layers.forEach(el => {
-        const config = presetData[el.id];
-        if (!config) return;
+async function applyPreset(presetName) {
+    const baseLayout = BROADCAST_PRESETS[presetName];
+    if (!baseLayout) return;
 
-        el.classList.add("is-transitioning");
-        el.style.left = `${config.x}px`;
-        el.style.top = `${config.y}px`;
-        el.style.width = `${config.w}px`;
-        el.style.height = `${config.h}px`;
+    // 1. Grab EVERY physical monitor currently on the canvas
+    const screens = document.querySelectorAll(".screen-layer");
+    if (screens.length === 0) return;
 
-  setTimeout(() => {
-        isAnimatingPreset = false;
-    }, 600);
+    // This offset ensures Monitor 2 doesn't steal Monitor 1's video channels
+    let channelOffset = 0;
+
+    // 2. Loop through each monitor one by one
+    screens.forEach((screen) => {
+        // Get the physical boundaries of THIS specific monitor
+        const mX = parseFloat(screen.style.left) || 0;
+        const mY = parseFloat(screen.style.top) || 0;
+        const mW = parseFloat(screen.style.width) || (7680 * canvasScale);
+        const mH = parseFloat(screen.style.height) || (4320 * canvasScale);
+
+        // Calculate the scale relative to our standard 8K baseline
+        const scaleX = mW / 7680;
+        const scaleY = mH / 4320;
+
+        // 3. Stamp the preset layout inside this monitor
+        baseLayout.forEach((config) => {
+            // Shift the channel ID (e.g., Monitor 1 gets Ch 0-5, Monitor 2 gets Ch 6-11)
+            const targetCh = config.ch + channelOffset;
+
+            let el = document.querySelector(`.video-layer[data-channel="${targetCh}"]:not(.screen-layer)`);
+
+            // Spawn the source if it doesn't exist yet
+            if (!el) {
+                spawnSourceOnCanvas("AUTO_SPAWN", 0, 0, null, "LIVE", null, 0, targetCh, false, "");
+                // Re-query the DOM immediately after spawning
+                el = document.querySelector(`.video-layer[data-channel="${targetCh}"]:not(.screen-layer)`);
+            }
+
+            if (el) {
+                // Position and scale it precisely within the current monitor
+                el.style.left = `${mX + (config.x * scaleX)}px`;
+                el.style.top = `${mY + (config.y * scaleY)}px`;
+                el.style.width = `${config.w * scaleX}px`;
+                el.style.height = `${config.h * scaleY}px`;
+
+                el.style.objectFit = "cover";
+                el.style.overflow = "hidden";
+
+                // Fire the new coordinates to the C++ engine
+                pushUpdateToHardware(el, true);
+            }
+        });
+
+        // Increase the offset by the amount of channels we just used, so the next monitor gets fresh channels
+        channelOffset += baseLayout.length;
     });
-
-    setTimeout(() => {
-        layers.forEach(el => pushUpdateToHardware(el, true));
-    }, 500);
 }
 
 window.updateMeshResolution = (density) => { console.log(`VaDA UI: Mesh Density set to ${density}x${density}`); };
@@ -3194,3 +3313,200 @@ function updateTopHUD(sourceElement) {
     // IMPORTANT: Clear the text from inside the camera box if you don't want it duplicated
     // sourceElement.querySelector(".source-telemetry").innerText = ""; 
 }
+
+
+// ==========================================================================
+// COLOR CONTROL ENGINE
+// ==========================================================================
+
+function initColorControls() {
+    const controls = [
+        { slider: 'colorBri', input: 'colorBriVal' },
+        { slider: 'colorCon', input: 'colorConVal' },
+        { slider: 'colorSat', input: 'colorSatVal' }
+    ];
+
+    controls.forEach(ctrl => {
+        const slider = document.getElementById(ctrl.slider);
+        const input = document.getElementById(ctrl.input);
+        
+        if (!slider || !input) return;
+
+        slider.addEventListener('input', (e) => {
+            input.value = e.target.value;
+            applyLiveColorPreview();
+        });
+
+        input.addEventListener('input', (e) => {
+            let val = parseInt(e.target.value) || 0;
+            slider.value = val;
+            applyLiveColorPreview();
+        });
+    });
+}
+
+function applyLiveColorPreview() {
+    if (!activeElement || activeElement.classList.contains("screen-layer")) return;
+
+    const bri = document.getElementById("colorBri").value;
+    const con = document.getElementById("colorCon").value;
+    const sat = document.getElementById("colorSat").value;
+
+    activeElement.style.filter = `brightness(${bri}%) contrast(${con}%) saturate(${sat}%)`;
+
+    activeElement.dataset.bri = bri;
+    activeElement.dataset.con = con;
+    activeElement.dataset.sat = sat;
+}
+
+window.resetColor = () => {
+    if (!activeElement) return;
+    
+    document.getElementById("colorBri").value = 100;
+    document.getElementById("colorBriVal").value = 100;
+    document.getElementById("colorCon").value = 100;
+    document.getElementById("colorConVal").value = 100;
+    document.getElementById("colorSat").value = 100;
+    document.getElementById("colorSatVal").value = 100;
+
+    applyLiveColorPreview();
+    window.pushColorToHardware();
+};
+
+window.pushColorToHardware = () => {
+    if (!activeElement || activeElement.classList.contains("screen-layer")) return;
+
+    const channelIdx = activeElement.dataset.channel;
+    if (channelIdx === undefined) return;
+
+    const bri = activeElement.dataset.bri || 100;
+    const con = activeElement.dataset.con || 100;
+    const sat = activeElement.dataset.sat || 100;
+
+    const url = `${API_BASE}/command?name=set_channel_color&channel=${channelIdx}&brightness=${bri}&contrast=${con}&saturation=${sat}`;
+    
+    addToQueue(url);
+    console.log(`📡 [Color Engine] Pushed profile to CH ${channelIdx}`);
+};
+
+// Start the engine on boot
+document.addEventListener("DOMContentLoaded", () => {
+    initColorControls();
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+    const tabs = document.querySelectorAll('.deck-tabs .tab-mini');
+    const colorPanel = document.getElementById('vada-color-panel');
+    const ndiPanel = document.getElementById('vada-ndi-panel');
+
+    // Select all bento inputs EXCEPT the ones inside our Custom Panels
+    const mappingInputs = Array.from(document.querySelectorAll('.deck-content .bento-input.mini'))
+                               .filter(el => !el.closest('#vada-color-panel') && !el.closest('#vada-ndi-panel'));
+
+    tabs.forEach(tab => {
+        tab.addEventListener('click', (e) => {
+            // Update button highlights
+            tabs.forEach(t => t.classList.remove('active'));
+            e.target.classList.add('active');
+
+            const tabName = e.target.textContent.trim().toLowerCase();
+
+            // 1. Hide everything to clear the board
+            mappingInputs.forEach(input => input.style.display = 'none');
+            if (colorPanel) colorPanel.style.display = 'none';
+            if (ndiPanel) ndiPanel.style.display = 'none';
+
+            // 2. Show only the specific tab clicked
+            if (tabName === 'color') {
+                if (colorPanel) colorPanel.style.display = 'flex';
+            } 
+            else if (tabName === 'ndi config') {
+                if (ndiPanel) ndiPanel.style.display = 'flex';
+            }
+            else if (tabName === 'mapping') {
+                mappingInputs.forEach(input => input.style.display = ''); 
+            }
+        });
+    });
+});
+
+// ==========================================================================
+// NDI CONFIG ENGINE
+// ==========================================================================
+
+function initNdiControls() {
+    const volSlider = document.getElementById('ndiVol');
+    const volInput = document.getElementById('ndiVolVal');
+
+    if (!volSlider || !volInput) return;
+
+    // Helper function to calculate the visual fill percentage
+    const updateSliderFill = (val) => {
+        const min = parseFloat(volSlider.min); // -50
+        const max = parseFloat(volSlider.max); // 20
+        const percentage = ((val - min) / (max - min)) * 100;
+        
+        // Push the percentage directly to our CSS variable
+        volSlider.style.setProperty('--fill-pct', `${percentage}%`);
+    };
+
+    // Sync Slider -> Text Box & Update Fill
+    volSlider.addEventListener('input', (e) => { 
+        volInput.value = e.target.value; 
+        updateSliderFill(e.target.value);
+    });
+
+    // Sync Text Box -> Slider & Update Fill
+    volInput.addEventListener('input', (e) => { 
+        let val = parseFloat(e.target.value) || 0;
+        
+        // Prevent typing outside the limits
+        if (val < -50) val = -50;
+        if (val > 20) val = 20;
+
+        volSlider.value = val; 
+        updateSliderFill(val);
+    });
+
+    // Set the initial fill color on load (0db is about 71.4% across the slider)
+    updateSliderFill(volSlider.value);
+}
+
+window.resetNdi = () => {
+    document.getElementById('ndiProfile').value = 'high';
+    document.getElementById('ndiBuffer').value = '0';
+    document.getElementById('ndiMute').checked = false;
+    document.getElementById('ndiTally').checked = false;
+
+    // THE FIX: Grab the slider, reset to 0, and artificially fire the 'input' event
+    const volSlider = document.getElementById('ndiVol');
+    volSlider.value = 0;
+    
+    // This forces the CSS fill calculation and the text box to update instantly!
+    volSlider.dispatchEvent(new Event('input'));
+};
+
+window.pushNdiToHardware = () => {
+    if (!activeElement || activeElement.classList.contains("screen-layer")) return;
+    const channelIdx = activeElement.dataset.channel;
+    if (channelIdx === undefined) return;
+
+    // Gather all settings from the UI
+    const profile = document.getElementById('ndiProfile').value;
+    const buffer = document.getElementById('ndiBuffer').value;
+    const vol = document.getElementById('ndiVol').value;
+    const mute = document.getElementById('ndiMute').checked ? 1 : 0;
+    const tally = document.getElementById('ndiTally').checked ? 1 : 0;
+
+    // Send the config to the C++ Engine via REST
+    // NOTE: You will need to confirm this exact API endpoint with your C++ engineer!
+    const url = `${API_BASE}/command?name=set_ndi_config&channel=${channelIdx}&profile=${profile}&buffer=${buffer}&vol=${vol}&mute=${mute}&tally=${tally}`;
+    
+    addToQueue(url);
+    console.log(`📡 [NDI Engine] Pushed network config to CH ${channelIdx}`);
+};
+
+// Initialize NDI listeners on boot
+document.addEventListener("DOMContentLoaded", () => {
+    initNdiControls();
+});
