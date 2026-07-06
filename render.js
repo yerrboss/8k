@@ -630,6 +630,7 @@ function setSidebarState(state) {
     // THE FIX: Hide the button!
     if (globalLockBtn) globalLockBtn.style.display = "none";
     
+
     const debugBox = document.getElementById("webrtc-debug-corner");
     if (debugBox) debugBox.style.display = "none";
     if (typeof stopWebRTC === "function") stopWebRTC();
