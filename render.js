@@ -491,22 +491,36 @@ document.addEventListener("mousedown", (e) => {
     console.error("CRITICAL BOOT ERROR - ENGINE HALTED:", err);
   }
 
-  const lockToggle = document.getElementById("lockToggle");
-  if (lockToggle) {
-    lockToggle.onchange = (e) => {
-      const isLocked = e.target.checked;
-      document.querySelectorAll(".video-layer, .screen-layer").forEach((el) => {
-        el.dataset.locked = isLocked ? "true" : "false";
-        el.classList.toggle("is-locked", isLocked);
-        if (isLocked) {
-          el.style.borderColor = UI_IDENTITY.critical;
-        } else {
-          el.style.borderColor = el === activeElement ? "#fff" : el.classList.contains("screen-layer") ? "#444" : UI_IDENTITY.accent;
-        }
-      });
-    };
+// --- THE NEW GLOBAL LOCK BUTTON LOGIC ---
+  const globalLockBtn = document.getElementById("globalLockBtn");
+  if (globalLockBtn) {
+      window.isGlobalLockActive = false; 
+      
+      globalLockBtn.onclick = () => {
+          // Flip the state
+          window.isGlobalLockActive = !window.isGlobalLockActive;
+          
+          // Apply the Active Design (Solid Cyan Glow) or Reset to Default
+          if (window.isGlobalLockActive) {
+              globalLockBtn.innerText = "CANVAS LOCKED";
+              globalLockBtn.style.background = "var(--vada-accent)";
+              globalLockBtn.style.color = "#000";
+              globalLockBtn.style.boxShadow = "0 0 15px var(--vada-accent)";
+          } else {
+              globalLockBtn.innerText = "LOCK CANVAS";
+              globalLockBtn.style.background = "transparent";
+              globalLockBtn.style.color = "var(--vada-accent)";
+              globalLockBtn.style.boxShadow = "none";
+          }
+          
+          // Apply lock state to the layers
+          document.querySelectorAll(".video-layer, .screen-layer").forEach((el) => {
+              el.dataset.locked = window.isGlobalLockActive ? "true" : "false";
+              el.classList.toggle("is-locked", window.isGlobalLockActive);
+          });
+      };
   }
-
+  
 goHome();
 });
 
@@ -589,10 +603,13 @@ function setSidebarState(state) {
   const inspector = document.getElementById("inspectorPanel");
   const layoutSection = document.getElementById("layoutSection");
   const quickLayoutSection = document.getElementById("quickLayoutSection");
-  const lock = document.getElementById("lockSection");
+  const lock = document.getElementById("lockSection"); // Kept just in case you use it later
   const reset = document.getElementById("resetSection");
   const actionButtons = document.getElementById("workspaceActionButtons");
-  const infraContainer = document.getElementById("infraContainer"); // Safe Infra Toggle
+  const infraContainer = document.getElementById("infraContainer"); 
+  
+  // THE FIX: Directly grab your new Lock Button by its ID
+  const globalLockBtn = document.getElementById("globalLockBtn");
 
   const scanBtn = document.querySelector("button[onclick='toggleScanner()']");
   const scanContainer = scanBtn ? scanBtn.parentElement : null;
@@ -601,17 +618,21 @@ function setSidebarState(state) {
     if (architect) architect.style.display = "block";
     if (scanContainer) scanContainer.style.display = "block";
     
+    // Hide Canvas Elements
     if (inspector) inspector.style.display = "none";
     if (layoutSection) layoutSection.style.display = "none";
     if (quickLayoutSection) quickLayoutSection.style.display = "none";
-    if (lock) lock.style.display = "block";
+    if (lock) lock.style.display = "none"; 
     if (reset) reset.style.display = "none";
     if (actionButtons) actionButtons.style.display = "none";
     if (infraContainer) infraContainer.style.display = "none"; 
     
+    // THE FIX: Hide the button!
+    if (globalLockBtn) globalLockBtn.style.display = "none";
+    
     const debugBox = document.getElementById("webrtc-debug-corner");
     if (debugBox) debugBox.style.display = "none";
-    stopWebRTC();
+    if (typeof stopWebRTC === "function") stopWebRTC();
 
   } else if (state === "WORKSPACE") {
     if (architect) architect.style.display = "none";
@@ -622,16 +643,21 @@ function setSidebarState(state) {
       const title = document.getElementById("inspectorTitle");
       if (title) title.innerText = "CANVAS SETTINGS";
     }
+    
+    // Show Canvas Elements
     if (layoutSection) layoutSection.style.display = "block";
     if (quickLayoutSection) quickLayoutSection.style.display = "block";
     if (lock) lock.style.display = "block";
     if (reset) reset.style.display = "block";
     if (actionButtons) actionButtons.style.display = "flex";
     if (infraContainer) infraContainer.style.display = "block"; 
+    
+    // THE FIX: Show the button!
+    if (globalLockBtn) globalLockBtn.style.display = "block";
 
     const debugBox = document.getElementById("webrtc-debug-corner");
     if (debugBox) debugBox.style.display = "flex";
-    initWebRTC();
+    if (typeof initWebRTC === "function") initWebRTC();
   }
 }
 
@@ -1385,24 +1411,24 @@ function makeTransformable(el) {
     });
 
 el.onpointerdown = (e) => {
-
-        // --- NEW LOCK GUARD ---
-        if (el.classList.contains('is-locked')) {
-            console.log("Source is locked. Dragging disabled.");
-            return; // Stop execution immediately
-        }
         if (warpActive || e.button === 1 || isSpacePressed) return;
         if (e.target.closest(".fullscreen-btn")) return;
 
         e.preventDefault(); 
         e.stopPropagation();
-        el.setPointerCapture(e.pointerId);
         
-        // --- ACTIVATING CROSSHAIR (#4) ---
-        document.body.classList.add("dragging-active");
-
+        // 1. ALWAYS ALLOW SELECTION (So you can right-click to unlock!)
         selectElement(el, e);
 
+        // 2. THE LOCK GUARD: Stop dragging, but keep the selection active
+        if (el.classList.contains('is-locked')) {
+            console.log("Source is locked. Dragging disabled.");
+            return; 
+        }
+
+        el.setPointerCapture(e.pointerId);
+        document.body.classList.add("dragging-active");
+        
         if (el.dataset.cropMode === "true") {
             let startX = e.clientX, startY = e.clientY;
             let currentPanX = parseFloat(el.dataset.panX) || 0;
@@ -1452,7 +1478,7 @@ el.onpointerdown = (e) => {
         el.classList.add("is-dragging");
         el.dataset.hwLock = "true";
 
-// --- THE BULLETPROOF TOOLTIP FIX ---
+        // --- THE BULLETPROOF TOOLTIP FIX ---
         let tooltip = document.getElementById("vada-drag-tooltip");
         if (!tooltip) {
             tooltip = document.createElement("div");
@@ -1873,7 +1899,15 @@ async function spawnSourceOnCanvas(name, dropX = 150, dropY = 150, forceId = nul
   layer.dataset.sourceUrl = sourceUrl || "";
 
   highestZ++;
+  
+  // NEW: Respect the global lock switch when spawning new layers
+  if (window.isGlobalLockActive) {
+      layer.dataset.locked = "true";
+      layer.classList.add("is-locked");
+  }
+
   layer.style.cssText = `width: 480px; height: 270px; left: ${dropX}px; top: ${dropY}px; position: absolute; z-index: ${highestZ}; border: 2px solid #00f2ff; background: rgba(0, 0, 0, 0.15); overflow: visible;`;
+  
   const isFile = srcType === "FILE" || name.toLowerCase().includes(".mp4");
   const icon = isFile ? "🎬" : "📹";
   const label = isFile ? "VIDEO FILE" : `LIVE FEED (SRC ${sIdx})`;
@@ -2084,13 +2118,7 @@ window.toggleElementLock = (shouldLock) => {
   if (!activeElement) return;
   activeElement.dataset.locked = shouldLock ? "true" : "false";
   activeElement.classList.toggle("is-locked", shouldLock);
-  if (activeElement.classList.contains("screen-layer")) {
-    activeElement.style.borderColor = shouldLock ? UI_IDENTITY.critical : "#444";
-  } else {
-    activeElement.style.borderColor = shouldLock ? UI_IDENTITY.critical : UI_IDENTITY.accent;
-  }
-  const lockToggle = document.getElementById("lockToggle");
-  if (lockToggle) lockToggle.checked = shouldLock;
+  // We explicitly do NOT flip the global "LOCK ALL" switch here anymore!
 };
 function syncInspector() {
     const infoContainer = document.getElementById("selectedSourceInfo");
