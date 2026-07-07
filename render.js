@@ -1482,6 +1482,7 @@ function makeTransformable(el) {
         ghost.style.left = `${finalLeft}px`;
         ghost.style.top = `${finalTop}px`;
 
+        
         hole.style.width = `${currentW}px`;
         hole.style.height = `${currentH}px`;
         hole.style.left = `${-finalLeft - 2}px`;
@@ -2930,27 +2931,137 @@ window.updateWebRTCUrl = (newUrl) => {
 
 startWebRTCAutoDiscovery();
 
+/* ==========================================================================
+   SMART CLUSTER BOUNDARY CALCULATOR
+   ========================================================================== */
+function getConnectedMonitorBounds(sourceElement) {
+    const screens = Array.from(document.querySelectorAll(".screen-layer"));
 
+    // Fallback: If no monitors exist, just use the whole canvas
+    if (screens.length === 0) return getCanvasBoundingBox();
+
+    // 1. Find the Source's Center Point
+    const sL = parseFloat(sourceElement.style.left) || 0;
+    const sT = parseFloat(sourceElement.style.top) || 0;
+    const sW = parseFloat(sourceElement.style.width) || 0;
+    const sH = parseFloat(sourceElement.style.height) || 0;
+    const sCenterX = sL + sW / 2;
+    const sCenterY = sT + sH / 2;
+
+    // 2. Identify the "Home Monitor" (The screen the center of the video is on)
+    let homeMonitor = null;
+    for (let screen of screens) {
+        const mX = parseFloat(screen.style.left) || 0;
+        const mY = parseFloat(screen.style.top) || 0;
+        const mW = parseFloat(screen.style.width) || 0;
+        const mH = parseFloat(screen.style.height) || 0;
+
+        if (sCenterX >= mX && sCenterX <= mX + mW && sCenterY >= mY && sCenterY <= mY + mH) {
+            homeMonitor = screen;
+            break;
+        }
+    }
+
+    // Fallback: If source is floating outside any monitor, use master canvas bounds
+    if (!homeMonitor) return getCanvasBoundingBox();
+
+    // 3. Scan for Connected Neighbors (Collision Detection)
+    const getRect = (el) => ({
+        l: parseFloat(el.style.left) || 0,
+        t: parseFloat(el.style.top) || 0,
+        r: (parseFloat(el.style.left) || 0) + (parseFloat(el.style.width) || 0),
+        b: (parseFloat(el.style.top) || 0) + (parseFloat(el.style.height) || 0)
+    });
+
+    const rects = screens.map(s => ({ el: s, rect: getRect(s) }));
+    const homeRectData = rects.find(r => r.el === homeMonitor);
+
+    let connectedGroup = [homeRectData];
+    let queue = [homeRectData];
+    let visited = new Set([homeMonitor]);
+
+    // 15px tolerance ensures that monitors slightly separated by UI borders still count as "touching"
+    const SNAP_TOLERANCE = 15; 
+
+    while (queue.length > 0) {
+        const current = queue.shift();
+
+        for (let other of rects) {
+            if (visited.has(other.el)) continue;
+
+            const c = current.rect;
+            const o = other.rect;
+
+            // Check if the two monitors are touching or overlapping
+            const intersects = !(
+                o.l > c.r + SNAP_TOLERANCE ||
+                o.r < c.l - SNAP_TOLERANCE ||
+                o.t > c.b + SNAP_TOLERANCE ||
+                o.b < c.t - SNAP_TOLERANCE
+            );
+
+            if (intersects) {
+                visited.add(other.el);
+                connectedGroup.push(other);
+                queue.push(other);
+            }
+        }
+    }
+
+    // 4. Calculate the bounding box of the connected cluster
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    connectedGroup.forEach(item => {
+        if (item.rect.l < minX) minX = item.rect.l;
+        if (item.rect.t < minY) minY = item.rect.t;
+        if (item.rect.r > maxX) maxX = item.rect.r;
+        if (item.rect.b > maxY) maxY = item.rect.b;
+    });
+
+    return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+}
 
 window.toggleFullScreen = (btn, e) => {
-  if (e) { e.stopPropagation(); e.preventDefault(); }
-  const el = btn.closest(".video-layer");
-  if (!el) return;
+    if (e) { e.stopPropagation(); e.preventDefault(); }
+    const el = btn.closest(".video-layer");
+    if (!el) return;
 
-  const isFull = el.dataset.isFull === "true";
-  const bounds = getCanvasBoundingBox();
+    const isFull = el.dataset.isFull === "true";
 
-  if (!isFull) {
-    el.dataset.oldW = el.style.width; el.dataset.oldH = el.style.height; el.dataset.oldL = el.style.left; el.dataset.oldT = el.style.top; el.dataset.oldZ = el.style.zIndex;
-    el.style.setProperty("width", `${bounds.w}px`, "important"); el.style.setProperty("height", `${bounds.h}px`, "important"); el.style.setProperty("left", `${bounds.x}px`, "important"); el.style.setProperty("top", `${bounds.y}px`, "important"); el.style.setProperty("z-index", "9999", "important");
-    el.dataset.isFull = "true"; btn.innerText = "⤬";
-  } else {
-    el.style.setProperty("width", el.dataset.oldW || "480px", "important"); el.style.setProperty("height", el.dataset.oldH || "270px", "important"); el.style.setProperty("left", el.dataset.oldL || "0px", "important"); el.style.setProperty("top", el.dataset.oldT || "0px", "important"); el.style.setProperty("z-index", el.dataset.oldZ || "1000", "important");
-    el.dataset.isFull = "false"; btn.innerText = "⛶";
-  }
-  el.dataset.lastMoveTime = Date.now();
-  if (el === activeElement) syncInspector();
-  pushUpdateToHardware(el, true);
+    if (!isFull) {
+        // --- THE NEW LOGIC: Calculate bounds based on monitor clusters ---
+        const bounds = getConnectedMonitorBounds(el);
+
+        // Save current dimensions to restore later
+        el.dataset.oldW = el.style.width; 
+        el.dataset.oldH = el.style.height; 
+        el.dataset.oldL = el.style.left; 
+        el.dataset.oldT = el.style.top; 
+        el.dataset.oldZ = el.style.zIndex;
+        
+        // Stretch to the smart cluster boundaries
+        el.style.setProperty("width", `${bounds.w}px`, "important"); 
+        el.style.setProperty("height", `${bounds.h}px`, "important"); 
+        el.style.setProperty("left", `${bounds.x}px`, "important"); 
+        el.style.setProperty("top", `${bounds.y}px`, "important"); 
+        el.style.setProperty("z-index", "9999", "important");
+        
+        el.dataset.isFull = "true"; 
+        btn.innerText = "⤬";
+    } else {
+        // Restore to original size
+        el.style.setProperty("width", el.dataset.oldW || "480px", "important"); 
+        el.style.setProperty("height", el.dataset.oldH || "270px", "important"); 
+        el.style.setProperty("left", el.dataset.oldL || "0px", "important"); 
+        el.style.setProperty("top", el.dataset.oldT || "0px", "important"); 
+        el.style.setProperty("z-index", el.dataset.oldZ || "1000", "important");
+        
+        el.dataset.isFull = "false"; 
+        btn.innerText = "⛶";
+    }
+    
+    el.dataset.lastMoveTime = Date.now();
+    if (el === activeElement && typeof syncInspector === 'function') syncInspector();
+    pushUpdateToHardware(el, true);
 };
 
 /* ==========================================================================
