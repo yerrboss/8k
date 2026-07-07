@@ -370,13 +370,38 @@ document.addEventListener("DOMContentLoaded", () => {
         /* =========================================================
            THE MISSING INFRASTRUCTURE LOCKS
            ========================================================= */
-        .screen-layer { pointer-events: none !important; border: 1px dashed rgba(0, 242, 255, 0.3) !important; background: transparent !important; z-index: 1 !important; transition: all 0.3s ease; }
+        .screen-layer { pointer-events: auto !important; border: 1px dashed rgba(0, 242, 255, 0.3) !important; background: transparent !important; z-index: 1 !important; transition: all 0.3s ease; }
         .screen-layer .transform-nodes, .screen-layer .rotate-node { display: none !important; }
+
+        /* Visual confirmation that you successfully targeted this monitor */
+body:not(.infra-mode-active) .screen-layer.active {
+    border: 1px solid #00f2ff !important;
+    background: rgba(0, 242, 255, 0.05) !important;
+    box-shadow: 0 0 20px rgba(0, 242, 255, 0.1) inset;
+}
+
+        /* THE NEW DISABLED MONITOR STATE */
+        body.infra-mode-active .screen-layer.is-disabled { 
+            border: 2px dashed #ff4444 !important; 
+            background: repeating-linear-gradient(45deg, rgba(255, 68, 68, 0.1), rgba(255, 68, 68, 0.1) 10px, transparent 10px, transparent 20px) !important; 
+            opacity: 0.4 !important; 
+        }
+        body.infra-mode-active .screen-layer.is-disabled .transform-nodes, 
+        body.infra-mode-active .screen-layer.is-disabled .rotate-node { 
+            border-color: #ff4444 !important; 
+        }
+
+        /* --- ADD THIS RULE TO HIDE IT IN THE WORKSPACE --- */
+        body:not(.infra-mode-active) .screen-layer.is-disabled {
+            display: none !important;
+        }
         
         body.infra-mode-active .screen-layer { pointer-events: auto !important; border: 2px dashed #ff00ff !important; background: repeating-linear-gradient(45deg, rgba(255, 0, 255, 0.05), rgba(255, 0, 255, 0.05) 10px, transparent 10px, transparent 20px) !important; z-index: 9999 !important; }
         body.infra-mode-active .screen-layer .transform-nodes, body.infra-mode-active .screen-layer .rotate-node { display: block !important; }
         
         body.infra-mode-active .video-layer:not(.screen-layer) { pointer-events: none !important; opacity: 0.15 !important; filter: grayscale(100%); transition: all 0.3s ease; }
+        
+        
     `;
   document.head.appendChild(style);
 
@@ -414,7 +439,7 @@ document.addEventListener("mousedown", (e) => {
         e.target.closest(".salray-title-bar") || 
         e.target.closest("#bottomControlDeck") || 
         e.target.closest("#inspectorPanel") || 
-        e.target.closest(".right-sidebar") ||
+        e.target.closest(".sidebar-right") || // <--- THE FIX IS HERE
         e.target.closest(".custom-dropdown") ||
         e.target.closest("#webrtc-debug-corner") ||
         e.target.closest("#architectPanel") ||
@@ -599,16 +624,26 @@ function autoConfigureWebRTC() {
    ========================================================================== */
 
 function setSidebarState(state) {
+  // --- FIX 1: FORCE CLEANUP SO INFRA-MODE NEVER LEAKS INTO WORKSPACE ---
+  document.body.classList.remove("infra-mode-active");
+  window.isInfrastructureMode = false;
+  const infraBtn = document.getElementById("infraToggleBtn");
+  if (infraBtn) {
+      infraBtn.style.background = "transparent";
+      infraBtn.style.color = "#ff00ff";
+      infraBtn.innerText = "EDIT INFRASTRUCTURE";
+  }
+  // ----------------------------------------------------------------------
+
   const architect = document.getElementById("architectPanel"); 
   const inspector = document.getElementById("inspectorPanel");
   const layoutSection = document.getElementById("layoutSection");
   const quickLayoutSection = document.getElementById("quickLayoutSection");
-  const lock = document.getElementById("lockSection"); // Kept just in case you use it later
+  const lock = document.getElementById("lockSection"); 
   const reset = document.getElementById("resetSection");
   const actionButtons = document.getElementById("workspaceActionButtons");
   const infraContainer = document.getElementById("infraContainer"); 
   
-  // THE FIX: Directly grab your new Lock Button by its ID
   const globalLockBtn = document.getElementById("globalLockBtn");
 
   const scanBtn = document.querySelector("button[onclick='toggleScanner()']");
@@ -712,6 +747,12 @@ function goHome() {
 function selectElement(el, event = null) {
     if (!el) return;
 
+
+    // --- NEW: REMEMBER THE LAST CLICKED MONITOR ---
+    if (el.classList.contains("screen-layer")) {
+        window.lastTargetedMonitor = el;
+    }
+    
     const isMulti = event && event.shiftKey;
     const isAlreadySelected = typeof selectedGroup !== 'undefined' && selectedGroup.has(el);
 
@@ -776,6 +817,7 @@ function selectElement(el, event = null) {
     syncInspector();
 
     // 3. Infrastructure Mode UI Update
+// 3. Infrastructure Mode UI Update
     if (activeElement && activeElement.classList.contains("screen-layer") && typeof isInfrastructureMode !== 'undefined' && isInfrastructureMode) {
         const title = document.getElementById("inspectorTitle");
         if(title) title.innerText = `OUTPUT ${activeElement.dataset.monitorNum || 0} CONFIG`;
@@ -789,6 +831,23 @@ function selectElement(el, event = null) {
         if (mH) mH.value = Math.round((parseFloat(activeElement.style.height) || activeElement.offsetHeight) / canvasScale);
         if (mX) mX.value = Math.round((parseFloat(activeElement.style.left) || activeElement.offsetLeft) / canvasScale);
         if (mY) mY.value = Math.round((parseFloat(activeElement.style.top) || activeElement.offsetTop) / canvasScale);
+
+        // --- NEW: SYNC THE ENABLE/DISABLE BUTTON ---
+        const btn = document.getElementById("monitorEnableBtn");
+        if (btn) {
+            const isDisabled = activeElement.dataset.disabled === "true";
+            if (!isDisabled) {
+                btn.innerText = "ENABLED";
+                btn.style.borderColor = "var(--vada-accent)";
+                btn.style.color = "var(--vada-accent)";
+                btn.style.boxShadow = "none";
+            } else {
+                btn.innerText = "DISABLED";
+                btn.style.borderColor = "#ff4444";
+                btn.style.color = "#ff4444";
+                btn.style.boxShadow = "0 0 10px rgba(255, 68, 68, 0.3)";
+            }
+        }
     } else {
         const title = document.getElementById("inspectorTitle");
         if (title && (!isInfrastructureMode)) title.innerText = "CANVAS SETTINGS";
@@ -1185,6 +1244,26 @@ if (scr.rotation !== undefined) {
     el.style.transform = `rotate(${uiRot}deg)`;
     el.dataset.rotation = uiRot;
     }
+    if (scr.rotation !== undefined) {
+        const hwRot = parseFloat(scr.rotation) || 0;
+        // The engine stores the inverted value. 
+        // We convert it back to UI rotation by re-inverting it.
+        let uiRot = (360 - (hwRot % 360)) % 360;
+        el.style.transform = `rotate(${uiRot}deg)`;
+        el.dataset.rotation = uiRot;
+    }
+
+    // --- THE ENGINE KILL-SWITCH (VISIBILITY ONLY) ---
+    const isInfra = document.body.classList.contains("infra-mode-active");
+    const isDisabled = (el.dataset.disabled === "true");
+
+    if (isDisabled && !isInfra) {
+        // If disabled AND in Workspace: Force it to disappear
+        el.style.setProperty("display", "none", "important");
+    } else {
+        // Otherwise: Bring it back, and let YOUR CSS handle the colors and opacity
+        el.style.setProperty("display", "flex", "important");
+    }
   });
 }
 
@@ -1420,6 +1499,13 @@ el.onpointerdown = (e) => {
         
         // 1. ALWAYS ALLOW SELECTION (So you can right-click to unlock!)
         selectElement(el, e);
+
+        // --- NEW FIX: PREVENT DRAGGING MONITORS IN WORKSPACE ---
+        const isInfraMode = document.body.classList.contains("infra-mode-active");
+        if (el.classList.contains("screen-layer") && !isInfraMode) {
+            return; // Stops the drag logic, but leaves it selected!
+        }
+        // -------------------------------------------------------
 
         // 2. THE LOCK GUARD: Stop dragging, but keep the selection active
         if (el.classList.contains('is-locked')) {
@@ -2728,56 +2814,59 @@ async function applyPreset(presetName) {
     const baseLayout = BROADCAST_PRESETS[presetName];
     if (!baseLayout) return;
 
-    // 1. Grab EVERY physical monitor currently on the canvas
-    const screens = document.querySelectorAll(".screen-layer");
-    if (screens.length === 0) return;
+    // 1. Determine the TARGET monitor (Prefer the selected one, fallback to the first one)
+    let targetMonitor = null;
+    if (activeElement && activeElement.classList.contains("screen-layer")) {
+        targetMonitor = activeElement;
+    } else {
+        targetMonitor = document.querySelector(".screen-layer"); // Defaults to Output 0
+    }
 
-    // This offset ensures Monitor 2 doesn't steal Monitor 1's video channels
-    let channelOffset = 0;
+    if (!targetMonitor) {
+        console.warn("VaDA: No physical monitor found to apply the layout.");
+        return; 
+    }
 
-    // 2. Loop through each monitor one by one
-    screens.forEach((screen) => {
-        // Get the physical boundaries of THIS specific monitor
-        const mX = parseFloat(screen.style.left) || 0;
-        const mY = parseFloat(screen.style.top) || 0;
-        const mW = parseFloat(screen.style.width) || (7680 * canvasScale);
-        const mH = parseFloat(screen.style.height) || (4320 * canvasScale);
+    // 2. Get the physical boundaries of THIS specific monitor
+    const mX = parseFloat(targetMonitor.style.left) || 0;
+    const mY = parseFloat(targetMonitor.style.top) || 0;
+    const mW = parseFloat(targetMonitor.style.width) || (7680 * canvasScale);
+    const mH = parseFloat(targetMonitor.style.height) || (4320 * canvasScale);
 
-        // Calculate the scale relative to our standard 8K baseline
-        const scaleX = mW / 7680;
-        const scaleY = mH / 4320;
+    // Calculate the scale relative to our standard 8K baseline
+    const scaleX = mW / 7680;
+    const scaleY = mH / 4320;
 
-        // 3. Stamp the preset layout inside this monitor
-        baseLayout.forEach((config) => {
-            // Shift the channel ID (e.g., Monitor 1 gets Ch 0-5, Monitor 2 gets Ch 6-11)
-            const targetCh = config.ch + channelOffset;
+    // 3. Smart Channel Offset
+    // Multiply the preset length by the monitor number so Monitor 1 doesn't steal Monitor 0's sources
+    const monitorNum = parseInt(targetMonitor.dataset.monitorNum) || 0;
+    const channelOffset = monitorNum * baseLayout.length;
 
-            let el = document.querySelector(`.video-layer[data-channel="${targetCh}"]:not(.screen-layer)`);
+    // 4. Stamp the preset layout ONLY inside the targeted monitor
+    baseLayout.forEach((config) => {
+        const targetCh = config.ch + channelOffset;
 
-            // Spawn the source if it doesn't exist yet
-            if (!el) {
-                spawnSourceOnCanvas("AUTO_SPAWN", 0, 0, null, "LIVE", null, 0, targetCh, false, "");
-                // Re-query the DOM immediately after spawning
-                el = document.querySelector(`.video-layer[data-channel="${targetCh}"]:not(.screen-layer)`);
-            }
+        let el = document.querySelector(`.video-layer[data-channel="${targetCh}"]:not(.screen-layer)`);
 
-            if (el) {
-                // Position and scale it precisely within the current monitor
-                el.style.left = `${mX + (config.x * scaleX)}px`;
-                el.style.top = `${mY + (config.y * scaleY)}px`;
-                el.style.width = `${config.w * scaleX}px`;
-                el.style.height = `${config.h * scaleY}px`;
+        // Spawn the source if it doesn't exist yet
+        if (!el) {
+            spawnSourceOnCanvas("AUTO_SPAWN", 0, 0, null, "LIVE", null, 0, targetCh, false, "");
+            el = document.querySelector(`.video-layer[data-channel="${targetCh}"]:not(.screen-layer)`);
+        }
 
-                el.style.objectFit = "cover";
-                el.style.overflow = "hidden";
+        if (el) {
+            // Position and scale it precisely within the target monitor
+            el.style.left = `${mX + (config.x * scaleX)}px`;
+            el.style.top = `${mY + (config.y * scaleY)}px`;
+            el.style.width = `${config.w * scaleX}px`;
+            el.style.height = `${config.h * scaleY}px`;
 
-                // Fire the new coordinates to the C++ engine
-                pushUpdateToHardware(el, true);
-            }
-        });
+            el.style.objectFit = "cover";
+            el.style.overflow = "hidden";
 
-        // Increase the offset by the amount of channels we just used, so the next monitor gets fresh channels
-        channelOffset += baseLayout.length;
+            // Fire the new coordinates to the C++ engine
+            pushUpdateToHardware(el, true);
+        }
     });
 }
 
@@ -2872,7 +2961,6 @@ window.toggleInfrastructureMode = () => {
     const body = document.body;
     const btn = document.getElementById("infraToggleBtn");
     
-    // Deselect anything currently selected to prevent bleed-over
     if (activeElement) {
         activeElement.classList.remove("active");
         activeElement = null;
@@ -2880,7 +2968,6 @@ window.toggleInfrastructureMode = () => {
     }
 
     if (isInfrastructureMode) {
-        // TURN ON: Ghost out videos, activate monitors
         body.classList.add("infra-mode-active");
         if(btn) {
             btn.style.background = "#ff00ff";
@@ -2891,9 +2978,7 @@ window.toggleInfrastructureMode = () => {
         document.getElementById("quickLayoutSection").style.display = "none";
         document.getElementById("monitorSetupSection").style.display = "block";
         document.getElementById("inspectorTitle").innerText = "INFRASTRUCTURE";
-        
     } else {
-        // TURN OFF: Lock monitors, reactivate videos
         body.classList.remove("infra-mode-active");
         if(btn) {
             btn.style.background = "transparent";
@@ -2905,6 +2990,18 @@ window.toggleInfrastructureMode = () => {
         document.getElementById("monitorSetupSection").style.display = "none";
         document.getElementById("inspectorTitle").innerText = "CANVAS SETTINGS";
     }
+
+    // --- FIX 2: INSTANT VISIBILITY OVERRIDE ---
+    // Forces disabled monitors to hide/show instantly without waiting for the sync loop
+    document.querySelectorAll('.screen-layer').forEach(el => {
+        if (el.dataset.disabled === "true") {
+            if (isInfrastructureMode) {
+                el.style.display = "flex";
+            } else {
+                el.style.setProperty("display", "none", "important");
+            }
+        }
+    });
 };
 
 window.applyMonitorSetup = () => {
@@ -3530,3 +3627,84 @@ window.pushNdiToHardware = () => {
 document.addEventListener("DOMContentLoaded", () => {
     initNdiControls();
 });
+
+/* ==========================================================================
+   NEW CAPABILITIES (MONITOR, RENAME, COLOR FILTERS)
+   ========================================================================== */
+
+// 1. SMART MONITOR TOGGLE (Context-Aware)
+window.toggleMonitorEnable = () => {
+    // Make sure we actually have a physical monitor selected
+    if (!activeElement || !activeElement.classList.contains("screen-layer")) return;
+
+    // Check its current state
+    const isDisabled = activeElement.dataset.disabled === "true";
+    const newState = !isDisabled; // Flip it
+
+    // Apply the state to the physical monitor layer
+    activeElement.dataset.disabled = newState ? "true" : "false";
+    activeElement.classList.toggle("is-disabled", newState);
+
+    // Update the UI Button instantly
+    const btn = document.getElementById("monitorEnableBtn");
+    if (btn) {
+        if (!newState) { // It is ENABLED
+            btn.innerText = "ENABLED";
+            btn.style.borderColor = "var(--vada-accent)";
+            btn.style.color = "var(--vada-accent)";
+            btn.style.boxShadow = "none";
+        } else { // It is DISABLED
+            btn.innerText = "DISABLED";
+            btn.style.borderColor = "#ff4444";
+            btn.style.color = "#ff4444";
+            btn.style.boxShadow = "0 0 10px rgba(255, 68, 68, 0.3)";
+        }
+    }
+
+    // Optional: Push this state to the C++ Engine here
+    // const monitorNum = parseInt(activeElement.dataset.monitorNum) || 0;
+    // const stateVal = newState ? 0 : 1; 
+    // addToQueue(`${API_BASE}/command?name=set_screen_state&index=${monitorNum}&state=${stateVal}`);
+};
+
+/* ==========================================================================
+   SMART MONITOR TOGGLE (Context-Aware)
+   ========================================================================== */
+window.toggleMonitorEnable = () => {
+    // 1. Ensure we actually have a physical monitor selected
+    if (!activeElement || !activeElement.classList.contains("screen-layer")) {
+        console.warn("VaDA: Please select a monitor first to toggle its state.");
+        return;
+    }
+
+    // 2. Check its current state and flip it
+    const isDisabled = activeElement.dataset.disabled === "true";
+    const newState = !isDisabled; 
+
+    // 3. Apply the state to the physical monitor layer
+    activeElement.dataset.disabled = newState ? "true" : "false";
+    activeElement.classList.toggle("is-disabled", newState);
+
+    // 4. Update the UI Button instantly
+    const btn = document.getElementById("monitorEnableBtn");
+    if (btn) {
+        if (!newState) { 
+            // ENABLED (Cyan)
+            btn.innerText = "ENABLED";
+            btn.style.borderColor = "var(--vada-accent)";
+            btn.style.color = "var(--vada-accent)";
+            btn.style.boxShadow = "none";
+        } else { 
+            // DISABLED (Red)
+            btn.innerText = "DISABLED";
+            btn.style.borderColor = "#ff4444";
+            btn.style.color = "#ff4444";
+            btn.style.boxShadow = "0 0 10px rgba(255, 68, 68, 0.3)";
+        }
+    }
+    
+    // 5. Force the hardware loop to acknowledge the change instantly
+    if (typeof pushUpdateToHardware === 'function') {
+        pushUpdateToHardware(activeElement, true);
+    }
+};
