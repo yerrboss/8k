@@ -1281,7 +1281,7 @@ aside.sidebar-right {
 
 /* 1. DEFAULT STATE: Monitors are unclickable guides */
 .screen-layer {
-    pointer-events: none !important; 
+    pointer-events: auto !important; 
     border: 1px dashed rgba(0, 242, 255, 0.15) !important;
     background: transparent !important;
     z-index: 1 !important;
