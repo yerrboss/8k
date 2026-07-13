@@ -225,6 +225,72 @@
               <label>Global Y-Offset</label>
               <input type="number" id="globalOffsetY" value="0" />
             </div>
+    
+            
+            <div id="vada-color-panel" style="display: none; width: 100%; flex-direction: column; gap: 8px; margin-top: 5px;">
+
+  <style>
+      .color-slider {
+          -webkit-appearance: none;
+          width: 200px !important; /* Forces it to match NDI and prevents 100% stretching */
+          height: 6px;
+          border-radius: 3px;
+          border: 1px solid #111;
+          outline: none;
+      }
+      .color-slider::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          height: 14px;
+          width: 14px;
+          border-radius: 50%;
+          background: #00f2ff; 
+          cursor: pointer;
+          box-shadow: 0 0 5px rgba(0, 242, 255, 0.5);
+          transition: transform 0.1s ease-out;
+      }
+      .color-slider::-webkit-slider-thumb:hover {
+          transform: scale(1.25);
+          background: #ffffff;
+          box-shadow: 0 0 10px #00f2ff;
+      }
+      
+/* Visual Gradient Tracks for Context */
+      #colorBri { background: linear-gradient(to right, #000000, #333333, #ffffff); }
+      #colorCon { background: linear-gradient(to right, #444444, #888888, #cccccc); }
+      #colorSat { background: linear-gradient(to right, #444444, #008899, #00f2ff); }
+      #colorOpa { background: linear-gradient(to right, #444444, #888888, #cccccc); } /* Restored to the original grey design! */
+  </style>
+
+  <div class="bento-input mini" style="display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 10px;">
+      <label style="width: 75px; margin-bottom: 0; font-size: 11px; color: #aaa;">Brightness</label>
+      <input type="range" id="colorBri" class="color-slider" min="0" max="200" value="100">
+      <input type="number" id="colorBriVal" value="100" style="width: 45px; background: #111; border: 1px solid #333; color: #00f2ff; text-align: center; padding: 2px; font-size: 11px; font-family: monospace;">
+  </div>
+
+  <div class="bento-input mini" style="display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 10px;">
+      <label style="width: 75px; margin-bottom: 0; font-size: 11px; color: #aaa;">Contrast</label>
+<input type="range" id="colorCon" class="color-slider" min="0" max="200" value="100">
+      <input type="number" id="colorConVal" value="100" style="width: 45px; background: #111; border: 1px solid #333; color: #00f2ff; text-align: center; padding: 2px; font-size: 11px; font-family: monospace;">
+  </div>
+
+  <div class="bento-input mini" style="display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 10px;">
+      <label style="width: 75px; margin-bottom: 0; font-size: 11px; color: #aaa;">Saturation</label>
+ <input type="range" id="colorSat" class="color-slider" min="0" max="200" value="100">
+      <input type="number" id="colorSatVal" value="100" style="width: 45px; background: #111; border: 1px solid #333; color: #00f2ff; text-align: center; padding: 2px; font-size: 11px; font-family: monospace;">
+  </div>
+
+  <div class="bento-input mini" style="display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 10px;">
+      <label style="width: 75px; margin-bottom: 0; font-size: 11px; color: #aaa;">Opacity</label>
+      <input type="range" id="colorOpa" class="color-slider" min="0" max="100" value="100">
+      <input type="number" id="colorOpaVal" value="100" style="width: 45px; background: #111; border: 1px solid #333; color: #00f2ff; text-align: center; padding: 2px; font-size: 11px; font-family: monospace;">
+  </div>
+
+<div style="flex: 1 1 100%; display: flex; justify-content: center; gap: 15px; margin-top: 10px;">
+    <button onclick="window.resetColor()" class="tab-mini" style="width: 120px; border: 1px solid #ff4444; color: #ff4444; background: transparent; padding: 6px; cursor: pointer;">RESET</button>
+    <button onclick="window.pushColorToHardware()" class="tab-mini active" style="width: 120px; background: #00f2ff; color: #000; border: none; font-weight: bold; padding: 6px; cursor: pointer;">APPLY</button>
+  </div>
+
+</div>
             
 <div id="vada-ndi-panel" style="display: none; width: 100%; flex-wrap: wrap; gap: 10px; margin-top: 5px;">
 
@@ -306,7 +372,7 @@
         <div class="scan-bar"></div>
       </main>
 
-      <aside class="sidebar-right">
+<aside class="sidebar-right">
 <div id="architectPanel">
   <div class="panel-header">
     <h2>Project Manager</h2>
@@ -364,15 +430,21 @@
 </div>
 
 <div id="layoutSection" style="padding: 10px 0; border-top: 1px solid #222; margin: 10px 20px 0 20px;">
-            <span style="font-size: 9px; color: #666; letter-spacing: 1.5px; display: block; margin-bottom: 10px;">LAYOUT PRESETS</span>
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-bottom: 10px;">
-                <button class="ptz-btn" style="font-size:10px; padding:6px; border-color:#444;" onclick="recallLayout(1)">P1</button>
-                <button class="ptz-btn" style="font-size:10px; padding:6px; border-color:#444;" onclick="recallLayout(2)">P2</button>
-                <button class="ptz-btn" style="font-size:10px; padding:6px; border-color:#444;" onclick="recallLayout(3)">P3</button>
-                <button class="ptz-btn" style="font-size:10px; padding:6px; border-color:#444;" onclick="recallLayout(4)">P4</button>
-                <button class="ptz-btn" style="font-size:10px; padding:6px; border-color:#444;" onclick="recallLayout(5)">P5</button>
-                <button class="ptz-btn" style="font-size:11px; padding:6px; border-color:#444;" onclick="recallLayout(6)">P6</button>
-            </div>
+    
+    <span style="font-size: 9px; color: #666; letter-spacing: 1.5px; display: block; margin-bottom: 10px;">LAYOUT PRESETS</span>
+    
+    <div id="presetGridContainer" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-bottom: 10px;">
+        <button class="ptz-btn" onclick="recallLayout(1)">P1<div class="preset-delete-icon" onclick="deletePreset(event, this)">×</div></button>
+        <button class="ptz-btn" onclick="recallLayout(2)">P2<div class="preset-delete-icon" onclick="deletePreset(event, this)">×</div></button>
+        <button class="ptz-btn" onclick="recallLayout(3)">P3<div class="preset-delete-icon" onclick="deletePreset(event, this)">×</div></button>
+        <button class="ptz-btn" onclick="recallLayout(4)">P4<div class="preset-delete-icon" onclick="deletePreset(event, this)">×</div></button>
+        <button class="ptz-btn" onclick="recallLayout(5)">P5<div class="preset-delete-icon" onclick="deletePreset(event, this)">×</div></button>
+        <button class="ptz-btn" onclick="recallLayout(6)">P6<div class="preset-delete-icon" onclick="deletePreset(event, this)">×</div></button>
+        
+        <button id="addPresetBtn" class="ptz-btn" style="border-color: var(--vada-accent); color: var(--vada-accent);" onclick="addNewPreset()">
+            <span style="font-size: 14px; line-height: 1;">+</span>
+        </button>
+    </div>
 <div id="workspaceActionButtons" style="padding: 0 20px 20px 20px; display: flex; flex-direction: column; gap: 8px; margin-top: 15px;">
             
             
@@ -383,18 +455,19 @@
             
         </div>
 
-        </div>
+</div>
 
         <div id="quickLayoutSection" style="padding: 10px 20px; border-top: 1px solid #222;">
             <span style="font-size: 9px; color: #666; letter-spacing: 1.5px; display: block; margin-bottom: 10px;">QUICK BROADCAST GRID</span>
             <div id="presetContainer" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px;"></div>
         </div>
 
-<div style="padding: 10px 20px; display: flex; justify-content: center;">
+  <div style="padding: 10px 20px; display: flex; justify-content: center;">
             <button id="globalLockBtn" class="btn-vada" style="width: 70%; font-size: 10px; padding: 10px; margin: 0; transition: all 0.2s ease;">
                 LOCK CANVAS
             </button>
         </div>
+
 
 <div id="monitorSetupSection" style="display: none; padding: 10px 20px; border-top: 1px solid #222;">
             <span style="font-size: 9px; color: #ff00ff; letter-spacing: 1.5px; display: block; margin-bottom: 10px; font-weight: bold;">HARDWARE MONITOR SETUP</span>
@@ -428,21 +501,8 @@
         </button>
       </div>
 
+</aside>
 
-<!-- <div id="networkSection" style="padding: 10px 0; border-top: 1px solid #222; margin: 10px 20px;">
-    <span style="font-size: 9px; color: #666; letter-spacing: 1.5px; display: block; margin-bottom: 10px;">SIGNALING SERVER</span>
-    <div style="display: flex; gap: 5px;">
-        <input type="text" id="webrtcUrlInput" 
-               class="vada-input-field"
-               style="flex: 3; background: #111; border: 1px solid #444; color: #00f2ff; font-family: monospace; font-size: 10px; padding: 10px; border-radius: 8px; width: 0; min-width: 0; outline: none;" 
-               placeholder="ws://192.168.0.168:8081">
-        <button class="ptz-btn" 
-                style="flex: 1.2; font-size: 10px; padding: 6px; border-radius: 8px;" 
-                onclick="updateWebRTCUrl(document.getElementById('webrtcUrlInput').value)">
-                APPLY
-        </button>
-    </div>
-</div> -->
 
           </div>
         </div>
@@ -514,6 +574,8 @@
         </div>
     </div>
 
+
+
 <div id="sourceTray" class="source-tray">
       <div class="tray-header"><span>IMPORT ENGINE</span></div>
       <div class="tray-options">
@@ -541,6 +603,14 @@
         Delete Source
       </div>
     </div>
+
+
+<div id="mediaContextMenu" class="salray-ctx" style="display: none; position: absolute;">
+    <div class="ctx-item" id="mediaCtxEdit" onclick="alert('BUTTON WORKING')">Rename</div>
+    <div class="ctx-item" id="mediaCtxDuplicate">Duplicate</div>
+    <div class="ctx-divider"></div>
+    <div class="ctx-item" id="mediaCtxDelete" style="color: #ff4444;">Delete</div>
+</div>
 
     <script src="render.js"></script>
   </body>
