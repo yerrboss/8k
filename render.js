@@ -708,6 +708,12 @@ function enterWorkspace(name, w, h) {
   if (taskName) taskName.innerText = "ACTIVE: " + name.toUpperCase();
   if (resInfo) resInfo.innerText = `${w} x ${h}`;
 
+  // --- RESET GLOBAL TRANSFORMS ---
+  uiZoom = 0.25; // Reset zoom to a safe starting point
+  panX = 0;      // Reset pan
+  panY = 0;      // Reset pan
+  updateCanvasTransform(); // Apply reset immediately
+
   if (activeElement) {
     activeElement.classList.remove("active");
     activeElement = null;
@@ -723,8 +729,14 @@ function enterWorkspace(name, w, h) {
     surface.style.border = "2px dashed rgba(255, 255, 255, 0.3)";
     surface.style.position = "absolute";
   }
+  
   window.hasHardwareCentered = false;
-  centerCanvas(w, h);
+  
+  // Use a small delay to ensure the browser has finished rendering the workspace switch
+  // before attempting to calculate the center point.
+  setTimeout(() => {
+      centerCanvas(w, h);
+  }, 100);
 }
 
 function goHome() {
@@ -1119,7 +1131,7 @@ if (el) {
             });
 
             if (el === activeElement) togglePTZControls(isPTZType);
-            if (el !== activeElement) el.style.zIndex = 1000 + index;
+if (el !== activeElement) el.style.zIndex = 1000 + index;
 
             const isBeingDragged = el.classList.contains("is-dragging");
             const wasRecentlyModified = (Date.now() - (parseInt(el.dataset.lastMoveTime) || 0)) < 3000;
@@ -1950,20 +1962,15 @@ async function assignSourceToChannel(channel, hardwareName, sourceUrl, isMediaFi
 
 async function spawnSourceOnCanvas(name, dropX = 150, dropY = 150, forceId = null, srcType = "LIVE", filePath = null, srcIndex = null, forceChannel = null, isSync = false, sourceUrl = "") {
   const stage = document.querySelector(".canvas-stage");
-  const surface = document.getElementById("activeSurface");
   if (!stage) return;
 
-// 1. IMPROVED CENTER-SNAP LOGIC (Clamps to Canvas)
+  // 1. Calculate Center Snap
   if (dropX === null || dropY === null) {
       const surface = document.getElementById("activeSurface");
       const surfaceRect = surface.getBoundingClientRect();
       const stageRect = stage.getBoundingClientRect();
-      
-      // Calculate center point relative to the surface
       const centerX = (surfaceRect.left - stageRect.left + (surfaceRect.width / 2)) / uiZoom;
       const centerY = (surfaceRect.top - stageRect.top + (surfaceRect.height / 2)) / uiZoom;
-      
-      // Subtract half of the default element size (480/2=240, 270/2=135) to center it
       dropX = centerX - 240;
       dropY = centerY - 135;
   }
@@ -1978,6 +1985,16 @@ async function spawnSourceOnCanvas(name, dropX = 150, dropY = 150, forceId = nul
   }
   if (assignedChannel === null) assignedChannel = 0;
 
+  // 2. THE TOP-LAYER FIX: Calculate new dynamic Z-Index
+  const allLayers = document.querySelectorAll(".video-layer");
+  let maxZ = 0;
+  allLayers.forEach(l => {
+      const z = parseInt(l.style.zIndex) || 0;
+      if (z > maxZ) maxZ = z;
+  });
+  highestZ = maxZ + 1;
+  // --------------------------------------------------
+
   const layer = document.createElement("div");
   layer.className = "video-layer moveable-source";
   layer.dataset.channel = assignedChannel;
@@ -1985,10 +2002,8 @@ async function spawnSourceOnCanvas(name, dropX = 150, dropY = 150, forceId = nul
   layer.dataset.srcType = srcType;
   layer.dataset.filePath = filePath || "";
   layer.dataset.sourceUrl = sourceUrl || "";
-
-  highestZ++;
+  layer.style.zIndex = "999999";
   
-  // NEW: Respect the global lock switch when spawning new layers
   if (window.isGlobalLockActive) {
       layer.dataset.locked = "true";
       layer.classList.add("is-locked");
@@ -2032,12 +2047,9 @@ async function spawnSourceOnCanvas(name, dropX = 150, dropY = 150, forceId = nul
 
   if (!isSync) {
     selectElement(layer);
-    
-    // ONLY fire add_channel if it is a truly new unregistered source (-999)
     if (sIdx === -999) {
         await assignSourceToChannel(assignedChannel, name, sourceUrl, isFile);
     }
-
     layer.dataset.lastMoveTime = Date.now() + 3000;
     setTimeout(() => { pushUpdateToHardware(layer, true); }, isFile ? 800 : 200);
   }
@@ -2245,13 +2257,15 @@ function syncInspector() {
     if (yInput) yInput.value = y;
     if (rotInput) rotInput.value = rot;
 
-    // --- SYNC COLOR SLIDERS ---
+// --- SYNC COLOR SLIDERS ---
     const briIn = document.getElementById("colorBri");
     const briVal = document.getElementById("colorBriVal");
     const conIn = document.getElementById("colorCon");
     const conVal = document.getElementById("colorConVal");
     const satIn = document.getElementById("colorSat");
     const satVal = document.getElementById("colorSatVal");
+    const opaIn = document.getElementById("colorOpa");
+    const opaVal = document.getElementById("colorOpaVal");
 
     if (briIn) {
         const b = activeElement.dataset.bri || 100;
@@ -2264,6 +2278,10 @@ function syncInspector() {
     if (satIn) {
         const s = activeElement.dataset.sat || 100;
         satIn.value = s; if (satVal) satVal.value = s;
+    }
+    if (opaIn) {
+        const o = activeElement.dataset.opa || 100;
+        opaIn.value = o; if (opaVal) opaVal.value = o;
     }
 }
 function setEdgeHighlight(el, edge, active) {
@@ -2645,36 +2663,56 @@ function initGlobalContextHandlers() {
 }
 
 function initImportEngine() {
-  const addBtn = document.querySelector(".btn-mini-add");
-  const tray = document.getElementById("sourceTray");
-  if (!addBtn || !tray) return;
-  addBtn.onclick = (e) => { e.stopPropagation(); tray.classList.toggle("open"); };
+    // 1. Grab ALL '+' buttons (This fixes the 'Only P1 works' bug)
+    const addBtns = document.querySelectorAll(".btn-mini-add");
+    const tray = document.getElementById("sourceTray");
 
-  const options = document.querySelectorAll(".tray-opt");
-  options.forEach((opt) => {
-    opt.onclick = async () => {
-      const type = opt.dataset.type;
-      if (type === "FILE") {
-        const res = await ipcRenderer.invoke("open-file-dialog");
-        if (res) {
-          const n = res.split(/[\\/]/).pop();
-          if (!localImportedFiles.find((f) => f.path === res)) { localImportedFiles.push({ id: n, name: n, type: "FILE", path: res }); }
-          addNewMediaToPool("FILE", n, res, -999, res);
+    if (!tray || addBtns.length === 0) return;
+
+    // 2. Attach safe click events to EVERY button
+    addBtns.forEach((btn) => {
+        btn.onclick = (e) => {
+            e.stopPropagation(); // Safe stop, doesn't break Media Pool
+            tray.classList.toggle("open");
+            btn.classList.toggle("tray-open");
+        };
+    });
+
+    // 3. Handle File Picker
+    const options = document.querySelectorAll(".tray-opt");
+    options.forEach((opt) => {
+        opt.onclick = async (e) => {
+            e.stopPropagation();
+            const type = opt.dataset.type;
+            if (type === "FILE") {
+                const res = await ipcRenderer.invoke("open-file-dialog");
+                if (res) {
+                    const n = res.split(/[\\/]/).pop();
+                    if (!localImportedFiles.find((f) => f.path === res)) {
+                        localImportedFiles.push({ id: n, name: n, type: "FILE", path: res });
+                    }
+                    addNewMediaToPool("FILE", n, res, -999, res);
+                }
+            }
+            // Close menu & reset all buttons
+            tray.classList.remove("open");
+            addBtns.forEach(b => b.classList.remove("tray-open"));
+        };
+    });
+
+    // 4. Safe Click-Outside (Will NOT block Media Pool items)
+    document.addEventListener("click", (event) => {
+        if (tray.classList.contains("open") && !tray.contains(event.target)) {
+            tray.classList.remove("open");
+            addBtns.forEach(b => b.classList.remove("tray-open"));
         }
-      }
-      tray.classList.remove("open");
-    };
-  });
+    });
 }
-
-/* ==========================================================================
-   MEDIA POOL LOGIC & ROUTING ENGINE (UNIFIED HOT-SWAP BARRAGE OVERRIDE)
-   ========================================================================== */
 /* ==========================================================================
    MEDIA POOL LOGIC & ROUTING ENGINE (UNIFIED HOT-SWAP BARRAGE OVERRIDE)
    ========================================================================== */
 window.executeHotSwap = async (type, name, source, url) => {
-    // 1. The Swap Shield (Prevents double-clicking)
+    // 1. The Swap Shield
     if (window.isSwapping) return;
     window.isSwapping = true;
     setTimeout(() => window.isSwapping = false, 800);
@@ -2689,11 +2727,15 @@ window.executeHotSwap = async (type, name, source, url) => {
 
     if (targetBox && !targetBox.classList.contains("screen-layer")) {
         const channelIndex = targetBox.dataset.channel;
-        const isFullState = targetBox.dataset.isFull === "true";
 
         try {
-            let actualSourceIndex = source;
-            targetBox.dataset.srcIndex = actualSourceIndex;
+            // --- THE CRITICAL MISSING LINK: TELL THE HARDWARE TO SWAP ---
+            // Call the same function you use when spawning a new source
+            // This sends the "add_channel" or "set_channel" command to the C++ Engine
+            await assignSourceToChannel(channelIndex, name, url || "", isMediaFile);
+
+            // Update UI Dataset
+            targetBox.dataset.srcIndex = source;
             targetBox.dataset.srcType = type;
             targetBox.dataset.filePath = name;
             targetBox.dataset.sourceUrl = url || "";
@@ -2703,7 +2745,7 @@ window.executeHotSwap = async (type, name, source, url) => {
 
             targetBox.dataset.lastMoveTime = Date.now() + 5000; 
 
-            // 2. The Sync Loop (Forces hardware update without adding a new channel)
+            // 2. The Sync Loop (Forces hardware update of layout)
             let syncCount = 0;
             const forceSyncInterval = setInterval(() => {
                 if (targetBox) {
@@ -2731,9 +2773,55 @@ function addNewMediaToPool(type, name, path, source, url) {
 
     const item = document.createElement("div");
     item.className = "media-item";
-    item.innerHTML = `<div class="media-meta"><label>${name}</label><span>SRC: ${source === -999 ? "UNREGISTERED" : source}</span></div>`;
-    item.onpointerdown = (e) => { e.preventDefault(); e.stopPropagation(); window.executeHotSwap(type, name, source, url); };
+    
+    // Safely format the source ID 
+    const safeSourceId = String(source).replace(/\s+/g, '-');
+    
+    // We are using <img> tags now!
+    item.innerHTML = `
+        <div class="media-preview-box" id="preview-${safeSourceId}">
+            <img id="thumb-${safeSourceId}" alt="NO SIGNAL" style="width:100%; height:100%; object-fit:cover; pointer-events:none; background:#050505; color:#444; font-size:9px; font-family:monospace; display:flex; align-items:center; justify-content:center;" />
+        </div>
+        <div class="media-meta">
+            <label class="media-name">${name}</label>
+            <span class="media-telemetry" id="telemetry-${safeSourceId}">4K60 • LIVE</span>
+        </div>
+        <div class="media-status-dot live"></div>
+    `;
+    
+    item.onpointerdown = (e) => { 
+        if (e.button === 2) return; 
+        e.preventDefault(); 
+        e.stopPropagation(); 
+        window.executeHotSwap(type, name, source, url); 
+    };
+    
     list.appendChild(item);
+    linkFeedToPreview(safeSourceId);
+}
+
+function linkFeedToPreview(sourceId) {
+    const imgElement = document.getElementById(`thumb-${sourceId}`);
+    if (!imgElement) return;
+
+    // We store the interval ID so we can kill it if the API is missing
+    const pollingInterval = setInterval(() => {
+        const timestamp = new Date().getTime();
+        
+        // The URL we are guessing. Change this when your C++ team replies!
+        const snapshotApiUrl = `${API_BASE}/snapshot?source=${sourceId}&t=${timestamp}`;
+        
+        imgElement.src = snapshotApiUrl;
+        
+    }, 500);
+
+    // If the server returns a 404 (Not Found), stop asking it!
+    imgElement.onerror = () => {
+        console.warn(`[VaDA UI] Stopping thumbnail requests for Source ${sourceId}. API endpoint not found.`);
+        clearInterval(pollingInterval);
+        imgElement.removeAttribute('src'); // Removes the broken image icon
+        imgElement.alt = "NO PREVIEW API";
+    };
 }
 
 function initSystemWindowControls() {
@@ -2765,9 +2853,71 @@ function initMediaCollapse() { console.log("Salrayworks: Media Core Subsystem - 
 window.toggleBgRemoval = (s) => { if (activeElement) activeElement.classList.toggle("ai-bg-removing", s); };
 window.hardResetWorkspace = () => { if (confirm("Purge all configuration and layers?")) location.reload(); };
 window.toggleScanner = () => { isScanning = !isScanning; document.body.classList.toggle("scanning", isScanning); };
-window.bringToFront = () => { if (activeElement) { highestZ++; activeElement.style.zIndex = highestZ; } };
-window.sendToBack = () => { if (activeElement) activeElement.style.zIndex = 101; };
+window.bringToFront = () => { 
+    if (!activeElement || activeElement.classList.contains("screen-layer")) return;
 
+    const currentCh = parseInt(activeElement.dataset.channel);
+    
+    // 1. Find the highest hardware channel currently active on the canvas
+    let maxCh = -1;
+    let topElement = null;
+    
+    document.querySelectorAll('.video-layer:not(.screen-layer)').forEach(el => {
+        const ch = parseInt(el.dataset.channel);
+        if (ch > maxCh) {
+            maxCh = ch;
+            topElement = el;
+        }
+    });
+
+    // If it's already the absolute top element, do nothing
+    if (currentCh >= maxCh) return;
+
+    // 2. SWAP the hardware channels in the UI data
+    activeElement.dataset.channel = maxCh;
+    if (topElement) topElement.dataset.channel = currentCh;
+
+    // 3. Push the new layer order directly to the C++ Engine compositor
+    pushUpdateToHardware(activeElement, true);
+    if (topElement) pushUpdateToHardware(topElement, true);
+    
+    // 4. Update the UI visually instantly (the sync loop will maintain this)
+    activeElement.style.zIndex = 1000 + maxCh;
+    if (topElement) topElement.style.zIndex = 1000 + currentCh;
+};
+
+window.sendToBack = () => { 
+    if (!activeElement || activeElement.classList.contains("screen-layer")) return;
+
+    const currentCh = parseInt(activeElement.dataset.channel);
+    
+    // 1. Find the lowest hardware channel currently active
+    let minCh = 999;
+    let bottomElement = null;
+    
+    document.querySelectorAll('.video-layer:not(.screen-layer)').forEach(el => {
+        const ch = parseInt(el.dataset.channel);
+        if (ch < minCh) {
+            minCh = ch;
+            bottomElement = el;
+        }
+    });
+
+    // If it's already the absolute bottom element, do nothing
+    if (currentCh <= minCh) return;
+
+    // 2. SWAP the hardware channels in the UI data
+    activeElement.dataset.channel = minCh;
+    if (bottomElement) bottomElement.dataset.channel = currentCh;
+
+    // 3. Push the new layer order directly to the C++ Engine compositor
+    pushUpdateToHardware(activeElement, true);
+    if (bottomElement) pushUpdateToHardware(bottomElement, true);
+    
+    // 4. Update the UI visually instantly
+    activeElement.style.zIndex = 1000 + minCh;
+    if (bottomElement) bottomElement.style.zIndex = 1000 + currentCh;
+};
 
 window.resetTransform = () => {
   if (activeElement) {
@@ -2798,6 +2948,44 @@ window.saveLayout = async (presetId = 1) => {
   } catch (err) {
     console.error(`❌ C++ Engine Rejected SAVE Command for Slot ${hardwareIndex}:`, err.message);
   }
+};
+
+/* ==========================================================================
+   DYNAMIC PRESET GENERATOR
+   ========================================================================== */
+let totalPresets = 6; 
+
+window.addNewPreset = () => {
+    const grid = document.getElementById("presetGridContainer");
+    const addBtn = document.getElementById("addPresetBtn");
+    
+    if (!grid || !addBtn) return;
+
+    totalPresets++;
+    const presetId = totalPresets;
+
+    const newBtn = document.createElement("button");
+    newBtn.className = "ptz-btn";
+    
+    // Inject the text AND the delete icon into the new button
+    newBtn.innerHTML = `P${presetId}<div class="preset-delete-icon" onclick="deletePreset(event, this)">×</div>`;
+    
+    newBtn.onclick = () => window.recallLayout(presetId);
+
+    grid.insertBefore(newBtn, addBtn);
+    console.log(`VaDA UI: Generated new layout slot P${presetId}`);
+};
+
+// The Master Delete Function
+window.deletePreset = (event, element) => {
+    // CRITICAL: This stops the click from bubbling up to the main button
+    // (Prevents the layout from loading right as you delete it)
+    event.stopPropagation(); 
+    
+    if (confirm("Delete this preset layout?")) {
+        // Find the parent button and remove it from the DOM
+        element.closest(".ptz-btn").remove();
+    }
 };
 
 window.recallLayout = async (presetId = 1) => {
@@ -3547,11 +3735,14 @@ function updateTopHUD(sourceElement) {
 // COLOR CONTROL ENGINE
 // ==========================================================================
 
+let liveColorDebounce; // Prevents flooding the hardware engine
+
 function initColorControls() {
     const controls = [
         { slider: 'colorBri', input: 'colorBriVal' },
         { slider: 'colorCon', input: 'colorConVal' },
-        { slider: 'colorSat', input: 'colorSatVal' }
+        { slider: 'colorSat', input: 'colorSatVal' },
+        { slider: 'colorOpa', input: 'colorOpaVal' }
     ];
 
     controls.forEach(ctrl => {
@@ -3560,11 +3751,13 @@ function initColorControls() {
         
         if (!slider || !input) return;
 
+        // Fire instantly while sliding
         slider.addEventListener('input', (e) => {
             input.value = e.target.value;
             applyLiveColorPreview();
         });
 
+        // Fire instantly while typing in the box
         input.addEventListener('input', (e) => {
             let val = parseInt(e.target.value) || 0;
             slider.value = val;
@@ -3579,26 +3772,53 @@ function applyLiveColorPreview() {
     const bri = document.getElementById("colorBri").value;
     const con = document.getElementById("colorCon").value;
     const sat = document.getElementById("colorSat").value;
+    const opa = document.getElementById("colorOpa").value;
 
-    activeElement.style.filter = `brightness(${bri}%) contrast(${con}%) saturate(${sat}%)`;
+    // 1. UI FIX: Target ONLY the camera feed/content, NOT the outer box
+    // This keeps your cyan borders, labels, and handles from changing color
+    const innerMedia = activeElement.querySelector(".centered-content, video, img, .media-preview-box");
+    if (innerMedia) {
+        innerMedia.style.filter = `brightness(${bri}%) contrast(${con}%) saturate(${sat}%)`;
+        innerMedia.style.opacity = opa / 100;
+    } else {
+        activeElement.style.filter = `brightness(${bri}%) contrast(${con}%) saturate(${sat}%)`;
+        activeElement.style.opacity = opa / 100;
+    }
 
+    // Save states
     activeElement.dataset.bri = bri;
     activeElement.dataset.con = con;
     activeElement.dataset.sat = sat;
+    activeElement.dataset.opa = opa;
+
+    // 2. HARDWARE FIX: Send the color values to the C++ Engine LIVE!
+    // A 100ms throttle ensures it feels perfectly live without crashing the backend
+    clearTimeout(liveColorDebounce);
+    liveColorDebounce = setTimeout(() => {
+        window.pushColorToHardware();
+    }, 100);
 }
 
 window.resetColor = () => {
     if (!activeElement) return;
     
-    document.getElementById("colorBri").value = 100;
-    document.getElementById("colorBriVal").value = 100;
-    document.getElementById("colorCon").value = 100;
-    document.getElementById("colorConVal").value = 100;
-    document.getElementById("colorSat").value = 100;
-    document.getElementById("colorSatVal").value = 100;
+    // Reset all normal sliders to 100
+    const resetVals = ['colorBri', 'colorCon', 'colorSat'];
+    resetVals.forEach(id => {
+        const slider = document.getElementById(id);
+        const input = document.getElementById(id + "Val");
+        if (slider) slider.value = 100;
+        if (input) input.value = 100;
+    });
 
+    // Reset Opacity (max is 100)
+    const opaSlider = document.getElementById('colorOpa');
+    const opaInput = document.getElementById('colorOpaVal');
+    if (opaSlider) opaSlider.value = 100;
+    if (opaInput) opaInput.value = 100;
+
+    // Apply & Push instantly
     applyLiveColorPreview();
-    window.pushColorToHardware();
 };
 
 window.pushColorToHardware = () => {
@@ -3607,21 +3827,23 @@ window.pushColorToHardware = () => {
     const channelIdx = activeElement.dataset.channel;
     if (channelIdx === undefined) return;
 
-    const bri = activeElement.dataset.bri || 100;
-    const con = activeElement.dataset.con || 100;
-    const sat = activeElement.dataset.sat || 100;
+    // Force values to integers (0-200) to match engine expectations
+    const bri = Math.round(activeElement.dataset.bri || 100);
+    const con = Math.round(activeElement.dataset.con || 100);
+    const sat = Math.round(activeElement.dataset.sat || 100);
+    const opa = Math.round(activeElement.dataset.opa || 100);
 
-    const url = `${API_BASE}/command?name=set_channel_color&channel=${channelIdx}&brightness=${bri}&contrast=${con}&saturation=${sat}`;
+    // This URL format must match your C++ engine's API expected parameters
+    const url = `${API_BASE}/command?name=set_channel_color&channel=${channelIdx}&brightness=${bri}&contrast=${con}&saturation=${sat}&opacity=${opa}`;
     
     addToQueue(url);
-    console.log(`📡 [Color Engine] Pushed profile to CH ${channelIdx}`);
+    console.log(`📡 [Color Engine] Pushing to C++ Engine (CH ${channelIdx}): B:${bri} C:${con} S:${sat} O:${opa}`);
 };
 
 // Start the engine on boot
 document.addEventListener("DOMContentLoaded", () => {
     initColorControls();
 });
-
 document.addEventListener("DOMContentLoaded", () => {
     const tabs = document.querySelectorAll('.deck-tabs .tab-mini');
     const colorPanel = document.getElementById('vada-color-panel');
@@ -3819,3 +4041,155 @@ window.toggleMonitorEnable = () => {
         pushUpdateToHardware(activeElement, true);
     }
 };
+
+/* ==========================================================================
+   FIXED MEDIA POOL CONTEXT MENU & RENAME ENGINE
+   ========================================================================== */
+(function() {
+    const mediaPoolList = document.getElementById("mediaPoolList");
+    const mediaMenu = document.getElementById("mediaContextMenu");
+    let activeMediaItem = null;
+
+    // The single, master listener for all right-click activity
+mediaPoolList.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const item = e.target.closest(".media-item");
+    if (!item) {
+        mediaMenu.style.display = "none";
+        return;
+    }
+
+    activeMediaItem = item;
+    mediaMenu.style.display = "block";
+    
+    // Use pageX/pageY to ensure it anchors to the document, not the panel
+    mediaMenu.style.left = `${e.pageX}px`;
+    mediaMenu.style.top = `${e.pageY}px`;
+}, { capture: true });
+    // Action Handlers
+    document.getElementById("mediaCtxEdit").onclick = () => {
+        if (!activeMediaItem) return;
+        const label = activeMediaItem.querySelector(".media-name");
+        if (!label) return;
+
+        const input = document.createElement("input");
+        input.type = "text";
+        input.value = label.textContent.trim();
+        input.style.cssText = "width:100%; background:#222; color:#fff; border:1px solid var(--vada-accent); padding:2px;";
+        
+        label.replaceWith(input);
+        input.focus();
+        input.select();
+
+        const saveRename = () => {
+            const newName = input.value.trim();
+            if (newName) label.textContent = newName;
+            input.replaceWith(label);
+        };
+
+        input.onkeydown = (e) => {
+            if (e.key === "Enter") saveRename();
+            if (e.key === "Escape") input.replaceWith(label);
+        };
+        input.onblur = saveRename;
+        mediaMenu.style.display = "none";
+    };
+
+    document.getElementById("mediaCtxDuplicate").onclick = () => {
+        if (!activeMediaItem) return;
+        const clone = activeMediaItem.cloneNode(true);
+        mediaPoolList.appendChild(clone);
+        mediaMenu.style.display = "none";
+    };
+
+    document.getElementById("mediaCtxDelete").onclick = () => {
+        if (activeMediaItem && confirm("Delete this source?")) {
+            activeMediaItem.remove();
+        }
+        mediaMenu.style.display = "none";
+    };
+
+    // Global Click Listener to close menu
+    document.addEventListener("click", (e) => {
+        if (!e.target.closest("#mediaContextMenu")) {
+            mediaMenu.style.display = "none";
+        }
+
+
+
+
+
+
+    });
+})();
+
+// Add this anywhere in your main JS file
+window.updateSourceTelemetry = function(sourceId, status, format, bitrate) {
+    const telemetryElement = document.getElementById(`telemetry-${sourceId}`);
+    if (!telemetryElement) return; // Exit if the source isn't in the pool
+
+    let indicatorColor = "#00f2ff"; // Default cyan
+    let dot = "🟢";
+
+    // Handle different health states
+    if (status === "OFFLINE" || status === "DROPPED") {
+        indicatorColor = "#ff3333"; // Red
+        dot = "🔴";
+        telemetryElement.innerText = `OFFLINE ${dot}`;
+    } 
+    else if (status === "BUFFERING" || status === "LAG") {
+        indicatorColor = "#ffcc00"; // Yellow
+        dot = "🟡";
+        telemetryElement.innerText = `BUFFERING ${dot}`;
+    } 
+    else {
+        // LIVE State
+        indicatorColor = "#00f2ff"; 
+        dot = "🟢";
+        // Example output: "2160p59.94 • 145Mbps 🟢"
+        telemetryElement.innerText = `${format} • ${bitrate}Mbps ${dot}`;
+    }
+
+    // Apply the color
+    telemetryElement.style.color = indicatorColor;
+};
+
+// --- TEMPORARY SIMULATION ENGINE ---fake data generator for testing the UI without a real WebSocket connection
+// Delete this once your real WebSocket is connected
+(function simulateNetworkData() {
+    setInterval(() => {
+        // Assume sources 0, 1, and 2 are in your media pool
+        const activeSources = [0, 1, 2]; 
+
+        activeSources.forEach(src => {
+            // Fake some bitrate fluctuation (e.g., NDI High Bandwidth hovering around 140Mbps)
+            const fakeBitrate = (140 + (Math.random() * 15 - 7.5)).toFixed(1); 
+            
+            // Randomly make source 2 buffer just so you can see the UI react
+            if (src === 2 && Math.random() > 0.8) {
+                window.updateSourceTelemetry(src, "BUFFERING", "", "");
+            } else {
+                window.updateSourceTelemetry(src, "LIVE", "2160p60", fakeBitrate);
+            }
+        });
+    }, 1000); // Updates every 1000ms
+})();
+
+// Example of how you will use this with your real backend
+webSocket.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    
+    // If the message from your C++/engine is a telemetry update:
+    if (data.type === "TELEMETRY_UPDATE") {
+        // Pass the live data straight to the UI function
+        window.updateSourceTelemetry(
+            data.sourceId, 
+            data.status,   // e.g., "LIVE"
+            data.format,   // e.g., "1080p60"
+            data.bitrate   // e.g., "45.2"
+        );
+    }
+};
+
