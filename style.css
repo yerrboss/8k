@@ -33,6 +33,10 @@ body {
     gap: 1px;
     background-color: var(--vada-border);
     transition: grid-template-columns 0.4s cubic-bezier(0.19, 1, 0.22, 1);
+    transform-origin: 0 0;
+    /* transform: scale(1.35);
+    width: calc(100vw / 1.35);
+    height: calc(100vh / 1.35); */
 }
 
 aside {
@@ -1279,6 +1283,12 @@ aside.sidebar-right {
    INFRASTRUCTURE "GHOST" MODE
    ========================================================================== */
 
+   /* Force the container to respect the new margin rather than auto-filling the space */
+#infraContainer {
+    margin-top: 10px !important; /* Adjust this number to move it higher or lower */
+    margin-bottom: 20px;
+}
+
 /* 1. DEFAULT STATE: Monitors are unclickable guides */
 .screen-layer {
     pointer-events: auto !important; 
@@ -1311,6 +1321,7 @@ body.infra-mode-active .video-layer:not(.screen-layer) {
     filter: grayscale(100%);
     transition: all 0.3s ease;
 }
+
 /* Canvas Origin Marker */
 #canvas-origin-marker {
     position: absolute; 
@@ -1411,31 +1422,55 @@ body.dragging-active #canvas-origin-marker {
 
 
 
+/* ==========================================================================
+   11. ZEN MODE & SLIDE HANDLES (UNIFIED)
+   ========================================================================== */
 
-/* ZUN */
-/* 2. Zen Toggle Button - Reduced size & always visible */
+/* --- The Zen Toggle Button (Absolute to Canvas) --- */
 .zen-toggle-btn {
-    position: fixed;
-    bottom: 270px; /* Aligns with the top of the bottom panel */
-    right: 340px;  /* Aligns to the left of the right panel */
-    width: 32px;   /* Smaller size */
+    position: absolute;
+    
+    /* Dynamically float 20px above whatever the deck height is */
+    bottom: calc(var(--deck-height, 250px) + 20px); 
+    right: 20px;
+    
+    width: 32px;
     height: 32px;
     background: rgba(0, 0, 0, 0.6);
     border: 1px solid var(--vada-accent);
     color: var(--vada-accent);
     border-radius: 4px;
     cursor: pointer;
-    z-index: 99999;
+    
+    /* Boosted to 9000 to beat video layers, but stay under dropdowns (99999) */
+    z-index: 9000; 
+    
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 14px; /* Smaller icon */
+    font-size: 14px;
     transition: all 0.4s cubic-bezier(0.19, 1, 0.22, 1);
-    opacity: 0.8;    /* Slight transparency when idle */
+    opacity: 0.8;
 }
-.zen-toggle-btn:hover { opacity: 1; background: var(--vada-accent); color: #000; }
 
-/* 3. Slide Handles - Sleeker and smaller */
+.zen-toggle-btn:hover { 
+    opacity: 1; 
+    background: var(--vada-accent); 
+    color: #000; 
+}
+
+.zen-toggle-btn.zen-mode-active {
+    bottom: 30px;
+    right: 30px;
+}
+
+/* Drop the button to the bottom when the deck is closed or in Zen Mode */
+body.hide-bottom .zen-toggle-btn,
+.zen-toggle-btn.zen-mode-active {
+    bottom: 20px;
+}
+
+/* --- Base Slide Handles --- */
 .panel-handle {
     position: fixed;
     background: rgba(0, 0, 0, 0.8);
@@ -1444,135 +1479,212 @@ body.dragging-active #canvas-origin-marker {
     display: flex;
     align-items: center; justify-content: center;
     cursor: pointer;
-    z-index: 99998;
-    opacity: 0; /* Only visible when hidden */
+    z-index: 999998;
+    opacity: 0; /* Hidden by default */
     pointer-events: none;
-    transition: all 0.3s ease;
+    transition: all 0.4s cubic-bezier(0.19, 1, 0.22, 1);
     font-size: 10px;
 }
 
+/* --- Left & Right Handles --- */
 .handle-left { left: 0; top: 50%; transform: translateY(-50%); width: 12px; height: 50px; border-left: none; border-radius: 0 4px 4px 0; }
 .handle-right { right: 0; top: 50%; transform: translateY(-50%); width: 12px; height: 50px; border-right: none; border-radius: 4px 0 0 4px; }
-.handle-bottom { bottom: 0; left: 50%; transform: translateX(-50%); width: 50px; height: 12px; border-bottom: none; border-radius: 4px 4px 0 0; }
 
 body.hide-left .handle-left, 
-body.hide-right .handle-right, 
-body.hide-bottom .handle-bottom { opacity: 1; pointer-events: auto; }
+body.hide-right .handle-right { opacity: 1; pointer-events: auto; }
 
-/* When classes are added, tell the grid to collapse that specific column */
-body.hide-left .app-container {
-    grid-template-columns: 0px 1fr 320px;
+/* --- Unified Bottom Handle Logic --- */
+.handle-bottom {
+    left: 50%;
+    transform: translateX(-50%);
+    width: 50px;
+    height: 12px;
+    border-bottom: none;
+    border-radius: 4px 4px 0 0;
+    
+    /* Locks to the top of the deck using the JS variable */
+    bottom: var(--deck-height, 250px);
+    margin: 0;
 }
 
-body.hide-right .app-container {
-    grid-template-columns: 280px 1fr 0px;
+/* When the deck is hidden, drop the handle to the floor */
+body.hide-bottom .handle-bottom {
+    bottom: 0px;
+    opacity: 1;
+    pointer-events: auto;
 }
 
-/* When both are hidden */
-body.hide-left.hide-right .app-container {
-    grid-template-columns: 0px 1fr 0px;
-}
-
-.zen-toggle-btn.zen-mode-active {
-    bottom: 30px;
-    right: 30px;
-}
-
-
-
-
-/* ==========================================================================
-   DYNAMIC EDGE RIDING (Appends to your existing styles)
-   ========================================================================== */
-
-/* 1. When in Full Canvas Mode, ALWAYS keep the handles visible and clickable */
+/* --- Zen Mode Visibility Overrides --- */
 body.zen-mode .panel-handle {
     opacity: 1 !important;
     pointer-events: auto !important;
 }
 
-/* 2. When in Full Canvas Mode AND the panel is OPEN, push the handle to the inner edge */
-body.zen-mode:not(.hide-left) .handle-left {
-    left: 280px; 
-}
+/* Push handles to the inner edges if panels are OPEN during Zen Mode */
+body.zen-mode:not(.hide-left) .handle-left { left: 280px; }
+body.zen-mode:not(.hide-right) .handle-right { right: 320px; }
 
-body.zen-mode:not(.hide-right) .handle-right {
-    right: 320px; 
-}
+/* --- App Container Grid Adjustments --- */
+body.hide-left .app-container { grid-template-columns: 0px 1fr 320px; }
+body.hide-right .app-container { grid-template-columns: 280px 1fr 0px; }
+body.hide-left.hide-right .app-container { grid-template-columns: 0px 1fr 0px; }
 
-body.zen-mode:not(.hide-bottom) .handle-bottom {
-    bottom: 250px; 
-}
-
-/* 6. Bottom Handle (Magnetically tracks the dynamic height) */
-.handle-bottom { 
-    /* USE THE LIVE VARIABLE INSTEAD OF 250px */
-    bottom: var(--deck-height, 250px) !important; 
-    
-    left: 50% !important; 
-    margin-left: -25px !important; 
-    width: 50px !important;  
-    height: 12px !important; 
-    border-bottom: none !important; 
-    border-radius: 4px 4px 0 0 !important; 
-}
-
-/* When closed, it still drops to the absolute bottom of the screen */
-body.hide-bottom .handle-bottom {
-    bottom: 0px !important; 
-}
-
-/* 6. Bottom Handle (Physically Locked to the Deck) */
-.handle-bottom { 
-    bottom: 0px !important; /* Anchor it to the absolute bottom of the screen */
-    margin-bottom: var(--deck-height, 250px) !important; /* Push it UP by exactly the deck height */
-    
-    left: 50% !important; 
-    margin-left: -25px !important; 
-    width: 50px !important;  
-    height: 12px !important; 
-    border-bottom: none !important; 
-    border-radius: 4px 4px 0 0 !important; 
-    
-    /* CRITICAL: Only transition the margin so it physically locks with the deck */
-    transition: margin-bottom 0.4s cubic-bezier(0.19, 1, 0.22, 1), opacity 0.3s ease !important;
-}
-
-body.hide-bottom .handle-bottom {
-    margin-bottom: 0px !important; /* Drops instantly in perfect sync with the deck */
-}
-
-/* 7. Bottom Deck (CSS Driven Slide) */
-#bottomControlDeck {
-    /* Animate the exact same property with the exact same bezier curve */
-    transition: margin-bottom 0.4s cubic-bezier(0.19, 1, 0.22, 1) !important;
-}
-
-body.hide-bottom #bottomControlDeck {
-    /* CSS pushes the deck perfectly out of frame */
-    margin-bottom: calc(-1 * var(--deck-height, 250px)) !important;
-}
-
-/* ==========================================================================
-   FULL SCREEN MODE SLIVER FIX
-   ========================================================================== */
-/* When the panels collapse, force them to hide overflow and fade out completely */
-
-body.hide-left .sidebar-left {
-    opacity: 0 !important;
-    overflow: hidden !important;
-    pointer-events: none !important;
-}
-
+/* Hide panels completely when collapsed to prevent slivers */
+body.hide-left .sidebar-left,
 body.hide-right .sidebar-right {
     opacity: 0 !important;
     overflow: hidden !important;
     pointer-events: none !important;
 }
 
+/* --- Bottom Deck CSS Slide --- */
+#bottomControlDeck {
+    transition: margin-bottom 0.4s cubic-bezier(0.19, 1, 0.22, 1) !important;
+}
+body.hide-bottom #bottomControlDeck {
+    margin-bottom: calc(-1 * var(--deck-height, 250px)) !important;
+}
+
+
+
+
+/* 1. Set the main row layout */
+.media-item {
+    display: flex !important;
+    align-items: center !important;
+    /* Your existing borders, heights, and background colors will remain intact here */
+}
+
+/* 2. The left-hand preview box (Sized exactly like the NDI badge) */
+.media-preview-box {
+    width: 45px;            
+    height: 38px;           
+    background-color: #0a0a0a;
+    border: 1px solid #1a1a1a;
+    border-radius: 4px;
+    margin-right: 0px;     /* Space between the video and your text */
+    flex-shrink: 0;         /* Stops it from shrinking */
+    overflow: hidden;       /* Keeps the video inside the rounded box */
+}
+
+/* Forces any video you pipe into the box to fit perfectly */
+.media-preview-box video, 
+.media-preview-box canvas {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* 3. The middle section */
+.media-meta {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;           /* This is the magic rule that pushes the cyan dot to the right */
+    min-width: 0;           
+}
+
+/* 4. The status dot on the far right */
+.media-status-dot {
+    width: 6px;             /* Kept small and subtle */
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-left: 15px;
+}
+
+.media-status-dot.live {
+    background-color: #00f2ff;
+    box-shadow: 0 0 6px rgba(0, 242, 255, 0.5); /* The glowing effect from your screenshot */
+}
+
+/* Targets the new snapshot image */
+.preview-snapshot {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;        /* Fills the box perfectly without distortion */
+    pointer-events: none;     /* Allows clicks to pass through to the parent box */
+    background-color: #0a0a0a; /* Keeps it dark while loading */
+    color: #444;              /* Colors the 'No Signal' alt text */
+    font-size: 8px;
+    font-family: monospace;
+    text-align: center;
+    line-height: 38px;        /* Vertically centers the alt text */
+}
+
+
+
+
+/* freaking enlargement */
+
 /* ==========================================================================
-   WORKSPACE TELEMETRY HUD (STRUCTURAL SUB-HEADER)
+   12. GLOBAL TYPOGRAPHY & AESTHETIC UPSCALE OVERRIDES
    ========================================================================== */
+
+/* --- 1. Main Headers & Panel Titles --- */
+.panel-header h2, .flyout-header, .tray-header { 
+    font-size: 12px !important; 
+    letter-spacing: 2px !important; 
+    font-weight: 600 !important;
+    color: #aaaaaa !important; /* Soften the white to reduce eye strain */
+    text-transform: uppercase !important;
+}
+
+/* --- 2. Input Labels & Metadata --- */
+/* Form inputs stay sleek and grey */
+.bento-input label { 
+    font-size: 11px !important; 
+    letter-spacing: 0.5px !important;
+    color: #888888 !important;
+}
+
+/* RESTORED: Media Pool titles go back to bright white */
+.media-meta label { 
+    font-size: 11px !important; 
+    letter-spacing: 0.5px !important;
+    color: #eeeeee !important; /* Restored to bright white */
+    font-weight: 600 !important;
+}
+
+.card-info .type, .layer-info { 
+    font-size: 12px !important; 
+    letter-spacing: 1px !important;
+    font-weight: 600 !important;
+}
+
+/* Media Pool Subtitles & Telemetry */
+.card-info .res, .media-meta span, .thumb-label, .source-telemetry { 
+    font-size: 10px !important; 
+    letter-spacing: 1px !important;
+    font-family: 'Consolas', 'Monaco', monospace !important; 
+    /* Removed any color overrides here so your JavaScript can still inject Cyan/Red for Live/Offline! */
+}
+/* --- 3. Standard Buttons (Primary Actions) --- */
+.btn-vada, .btn-primary-action, .ptz-btn {
+    font-size: 12px !important; 
+    font-weight: 600 !important;
+    /* 2:1 Aspect Ratio Padding for a sleek, widescreen look */
+    padding: 14px 28px !important; 
+    letter-spacing: 1.5px !important;
+    border-radius: 6px !important; /* Smooth but not bubbly */
+    border-width: 1px !important;  /* Keep borders razor thin */
+}
+
+/* --- 4. Mini Buttons (Tabs, Add, Reset) --- */
+.tab-mini, .btn-mini-add, .btn-danger-mini {
+    font-size: 10px !important; 
+    font-weight: 600 !important;
+    letter-spacing: 1px !important;
+    padding: 8px 16px !important; 
+    border-radius: 4px !important;
+}
+
+/* --- 5. Dropdowns & Context Menus --- */
+.dropdown-selected, .option, .ctx-item, .tray-opt, .flyout-item {
+    font-size: 12px !important; 
+    letter-spacing: 1px !important;
+    padding: 12px 20px !important; 
+}
+
 #selectedSourceInfo {
     /* 1. Structural Layout (NO absolute positioning!) */
     position: relative !important;
@@ -1611,12 +1723,102 @@ body.hide-right .sidebar-right {
     border: none !important;
 }
 
-/* ==========================================================================
-   ZEN MODE / FULL SCREEN HUD SCALING
-   ========================================================================== */
 body.zen-mode #selectedSourceInfo {
     height: 45px !important;       /* ~1.5x taller */
     font-size: 16px !important;    /* ~1.5x bigger font */
     letter-spacing: 1px !important; /* Slightly wider spacing for the larger font */
+}
+
+/* --- 7. Sidebar Grid Buttons (Presets & Quick Broadcast) --- */
+#layoutSection .ptz-btn,
+#presetContainer .ptz-btn {
+    font-size: 12px !important;      /* Bumped up from 9px/10px */
+    padding: 10px 4px !important;    /* Taller, but keeps width constrained */
+    letter-spacing: 1px !important;
+    font-weight: 600 !important;
+}
+
+/* --- 8. Preset Delete Icon --- */
+#presetGridContainer .ptz-btn {
+    position: relative; /* Anchors the absolute X */
+    overflow: visible;  /* Allows the X to peek out past the borders */
+}
+
+.preset-delete-icon {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 16px;
+    height: 16px;
+    background: #ff4444;
+    color: #000;
+    border-radius: 50%;
+    font-size: 12px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;           /* Hidden by default */
+    pointer-events: none; /* Can't be accidentally clicked when hidden */
+    transition: all 0.2s;
+    z-index: 10;
+    box-shadow: 0 0 5px rgba(255, 68, 68, 0.5);
+}
+
+/* Show the X when hovering over the preset button */
+#presetGridContainer .ptz-btn:hover .preset-delete-icon {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.preset-delete-icon:hover {
+    transform: scale(1.2);
+    background: #ff0000;
+    color: #fff;
+}
+
+.salray-ctx {
+    position: fixed !important; /* Force to viewport, not sidebar */
+    display: none;
+    background: #111;
+    border: 1px solid var(--vada-accent);
+    width: 180px;
+    /* Use a massive z-index to stay above everything else */
+    z-index: 9999999 !important; 
+    box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+    padding: 5px 0;
+    pointer-events: auto !important; /* Ensure it captures clicks */
+}
+
+/* PREVIEW BOX HIDDEN */
+.media-preview-box {
+    display: none !important;
+}
+
+/* ========================================== */
+/* DISCOVERY FLYOUT MENU SCROLLBAR            */
+/* ========================================== */
+
+/* 1. Constrain the height and enable scrolling */
+.flyout-list {
+    max-height: 250px; /* Adjust this number to make the menu taller or shorter */
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 5px; /* Keeps the text from hugging the scrollbar */
+}
+
+/* 2. Style the custom VaDA scrollbar */
+.flyout-list::-webkit-scrollbar {
+    width: 6px;
+}
+.flyout-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+.flyout-list::-webkit-scrollbar-thumb {
+    background: #333;
+    border-radius: 3px;
+}
+.flyout-list::-webkit-scrollbar-thumb:hover {
+    background: #555;
 }
 
